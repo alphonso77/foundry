@@ -1,0 +1,45 @@
+import express from 'express';
+import { oauthRouter } from './auth/routes';
+import { loadIntegrations } from './integrations';
+{{#ifEquals apiDocs true}}
+import swaggerUi from 'swagger-ui-express';
+import { openapiDocument } from './openapi';
+{{/ifEquals}}
+
+export function createApp(): express.Express {
+  const app = express();
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // Eagerly resolve configured integrations so misconfiguration fails fast.
+  const integrations = loadIntegrations();
+
+  app.get('/health', (_req, res) => {
+    res.json({
+      ok: true,
+      service: '{{serviceName}}',
+      integrations: Object.keys(integrations),
+    });
+  });
+
+{{#ifEquals apiDocs true}}
+  // Interactive Swagger UI at /docs. The OAuth2 Authorization Code flow is wired so
+  // the "Authorize" button drives a real exchange{{#ifEquals pkce true}}, with PKCE generated in-browser{{/ifEquals}}.
+  app.use(
+    '/docs',
+    swaggerUi.serve,
+    swaggerUi.setup(openapiDocument, {
+      swaggerOptions: {
+{{#ifEquals pkce true}}
+        usePkceWithAuthorizationCodeGrant: true,
+{{/ifEquals}}
+        persistAuthorization: true,
+      },
+    }),
+  );
+{{/ifEquals}}
+
+  app.use('/oauth', oauthRouter);
+
+  return app;
+}

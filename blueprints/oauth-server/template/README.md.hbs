@@ -1,0 +1,72 @@
+# {{serviceName}}
+
+An OAuth 2.0 authorization server scaffolded by [Foundry](https://github.com/fratelli/foundry).
+
+- **Token strategy:** `{{tokenStrategy}}`
+- **PKCE:** {{#ifEquals pkce true}}enabled{{else}}disabled{{/ifEquals}}
+- **Datastore:** {{datastore}}
+- **Deploy target:** AWS ECS (Fargate)
+
+## Getting started
+
+```bash
+npm install
+cp .env.example .env   # then fill in secrets
+npm run migrate        # apply the Postgres schema
+npm run dev            # start the server on PORT (default 3000)
+```
+
+Build & typecheck:
+
+```bash
+npm run build
+npm run typecheck
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness probe. |
+| GET | `/oauth/authorize` | Issues an authorization code (`?client_id=&scope=`{{#ifEquals pkce true}}`&code_challenge=`{{/ifEquals}}). |
+| POST | `/oauth/token` | Exchanges an authorization code or refresh token for tokens. |
+{{#ifEquals apiDocs true}}| GET | `/docs` | Interactive Swagger UI for the OAuth endpoints. |
+{{/ifEquals}}
+
+{{#ifEquals apiDocs true}}
+## Interactive API docs
+
+With the server running, open **http://localhost:3000/docs** for a Swagger UI of the
+OAuth endpoints.
+{{#ifEquals pkce true}}
+The Authorization Code flow is wired with **PKCE**: click **Authorize**, and Swagger UI
+generates a `code_verifier`/`code_challenge` (S256) in the browser and runs a real
+authorization-code-with-PKCE exchange against `/oauth/authorize` → `/oauth/token`.
+{{else}}
+The Authorization Code flow is wired into the **Authorize** button so you can run a real
+`/oauth/authorize` → `/oauth/token` exchange from the browser.
+{{/ifEquals}}
+{{/ifEquals}}
+
+{{#ifEquals tokenStrategy "local-jwt"}}
+Tokens are minted locally as JWTs signed with `JWT_SECRET`.
+{{else}}
+Tokens are obtained from the external IdP at `IDP_ISSUER`. Wire the exchange in `src/auth/tokens.ts`.
+{{/ifEquals}}
+
+## Integrations
+
+{{#ifIncludes integrations "stripe"}}- **Stripe** — config loaded from `STRIPE_API_KEY`.
+{{/ifIncludes}}{{#ifIncludes integrations "salesforce"}}- **Salesforce** — config loaded from `SALESFORCE_CLIENT_ID` / `SALESFORCE_CLIENT_SECRET`.
+{{/ifIncludes}}{{#ifIncludes integrations "hubspot"}}- **HubSpot** — config loaded from `HUBSPOT_API_KEY`.
+{{/ifIncludes}}
+
+## Deploy
+
+Terraform skeleton for AWS ECS lives in `infra/`. It is intentionally minimal (cluster, ECR repo, log group, task definition) — extend with networking and secrets before production use.
+
+```bash
+cd infra
+terraform init
+terraform plan
+```

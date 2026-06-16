@@ -1,0 +1,50 @@
+{
+  "id": "demo",
+  "name": "Demo Blueprint",
+  "version": "0.1.0",
+  "description": "Generator test fixture exercising every field type and helper.",
+  "deployTarget": "aws-ecs",
+  "inputs": {
+    "fields": [
+      {
+        "key": "serviceName",
+        "label": "Service name",
+        "type": "string",
+        "required": true,
+        "pattern": "^[a-z][a-z0-9-]*$",
+        "placeholder": "my-service"
+      },
+      { "key": "enabled", "label": "Enabled", "type": "boolean", "default": true },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "type": "select",
+        "default": "a",
+        "options": [
+          { "value": "a", "label": "Mode A" },
+          { "value": "b", "label": "Mode B" }
+        ]
+      },
+      {
+        "key": "tags",
+        "label": "Tags",
+        "type": "multiselect",
+        "default": [],
+        "options": [
+          { "value": "x", "label": "X" },
+          { "value": "y", "label": "Y" },
+          { "value": "z", "label": "Z" }
+        ]
+      },
+      {
+        "key": "datastore",
+        "label": "Datastore",
+        "type": "select",
+        "required": true,
+        "default": "postgres",
+        "options": [{ "value": "postgres", "label": "PostgreSQL" }]
+      }
+    ]
+  },
+  "files": ["README.md.hbs", "static.txt", "src/config.ts.hbs"]
+}

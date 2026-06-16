@@ -1,0 +1,39 @@
+{
+  "id": "demo",
+  "name": "Demo Blueprint",
+  "version": "0.1.0",
+  "description": "Server integration test fixture.",
+  "deployTarget": "aws-ecs",
+  "inputs": {
+    "fields": [
+      {
+        "key": "serviceName",
+        "label": "Service name",
+        "type": "string",
+        "required": true,
+        "pattern": "^[a-z][a-z0-9-]*$",
+        "placeholder": "my-service"
+      },
+      { "key": "pkce", "label": "PKCE", "type": "boolean", "default": true },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "type": "select",
+        "default": "a",
+        "options": [
+          { "value": "a", "label": "Mode A" },
+          { "value": "b", "label": "Mode B" }
+        ]
+      },
+      {
+        "key": "datastore",
+        "label": "Datastore",
+        "type": "select",
+        "required": true,
+        "default": "postgres",
+        "options": [{ "value": "postgres", "label": "PostgreSQL" }]
+      }
+    ]
+  },
+  "files": ["README.md.hbs", "package.json.hbs"]
+}

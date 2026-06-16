@@ -1,0 +1,96 @@
+import { Router, Request, Response } from 'express';
+{{#ifEquals pkce true}}
+import { verifyPkce } from './pkce';
+{{/ifEquals}}
+{{#ifEquals tokenStrategy "local-jwt"}}
+import { issueTokens, verifyToken } from './tokens';
+{{else}}
+import { exchangeAuthorizationCode } from './tokens';
+{{/ifEquals}}
+
+export const oauthRouter = Router();
+
+// In-memory authorization code store (prototype only — production persists to Postgres).
+interface AuthCodeRecord {
+  subject: string;
+  scope: string[];
+  codeChallenge?: string;
+}
+const authCodes = new Map<string, AuthCodeRecord>();
+
+/**
+ * GET /oauth/authorize — issues a short-lived authorization code.
+ */
+oauthRouter.get('/authorize', (req: Request, res: Response) => {
+  const clientId = String(req.query.client_id ?? '');
+  if (!clientId) {
+    return res
+      .status(400)
+      .json({ error: 'invalid_request', error_description: 'client_id is required' });
+  }
+  const scope = String(req.query.scope ?? '')
+    .split(' ')
+    .filter(Boolean);
+
+  const code = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const record: AuthCodeRecord = { subject: clientId, scope };
+{{#ifEquals pkce true}}
+  if (req.query.code_challenge) {
+    record.codeChallenge = String(req.query.code_challenge);
+  }
+{{/ifEquals}}
+  authCodes.set(code, record);
+  return res.json({ code });
+});
+
+/**
+ * POST /oauth/token — exchanges an authorization code (or refresh token) for tokens.
+ */
+oauthRouter.post('/token', async (req: Request, res: Response) => {
+  const grantType = String(req.body?.grant_type ?? '');
+
+{{#ifEquals tokenStrategy "local-jwt"}}
+  if (grantType === 'authorization_code') {
+    const code = String(req.body?.code ?? '');
+    const record = authCodes.get(code);
+    if (!record) {
+      return res.status(400).json({ error: 'invalid_grant' });
+    }
+{{#ifEquals pkce true}}
+    const codeVerifier = String(req.body?.code_verifier ?? '');
+    if (record.codeChallenge && !verifyPkce(codeVerifier, record.codeChallenge)) {
+      return res
+        .status(400)
+        .json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
+    }
+{{/ifEquals}}
+    authCodes.delete(code);
+    return res.json(issueTokens(record.subject, record.scope));
+  }
+
+  if (grantType === 'refresh_token') {
+    const refreshToken = String(req.body?.refresh_token ?? '');
+    try {
+      const payload = verifyToken(refreshToken);
+      return res.json(issueTokens(String(payload.sub ?? ''), []));
+    } catch {
+      return res.status(400).json({ error: 'invalid_grant' });
+    }
+  }
+
+  return res.status(400).json({ error: 'unsupported_grant_type' });
+{{else}}
+  if (grantType === 'authorization_code') {
+    const code = String(req.body?.code ?? '');
+    try {
+      return res.json(await exchangeAuthorizationCode(code));
+    } catch (err) {
+      return res
+        .status(400)
+        .json({ error: 'invalid_grant', error_description: String(err) });
+    }
+  }
+
+  return res.status(400).json({ error: 'unsupported_grant_type' });
+{{/ifEquals}}
+});

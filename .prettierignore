@@ -1,0 +1,8 @@
+# Blueprint templates contain {{handlebars}} and intentionally-partial source;
+# Prettier must not rewrite them.
+blueprints/
+node_modules/
+dist/
+build/
+coverage/
+*.zip

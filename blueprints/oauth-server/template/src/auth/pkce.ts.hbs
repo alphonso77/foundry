@@ -1,0 +1,25 @@
+{{#ifEquals pkce true}}
+import { createHash, randomBytes } from 'crypto';
+
+export interface PkceChallenge {
+  codeVerifier: string;
+  codeChallenge: string;
+  codeChallengeMethod: 'S256';
+}
+
+export function generatePkceChallenge(): PkceChallenge {
+  const codeVerifier = randomBytes(32).toString('base64url');
+  const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+  return { codeVerifier, codeChallenge, codeChallengeMethod: 'S256' };
+}
+
+export function verifyPkce(codeVerifier: string, codeChallenge: string): boolean {
+  const expected = createHash('sha256').update(codeVerifier).digest('base64url');
+  return expected === codeChallenge;
+}
+{{else}}
+// PKCE is disabled for this service. This no-op keeps the route wiring uniform.
+export function verifyPkce(_codeVerifier: string, _codeChallenge: string): boolean {
+  return true;
+}
+{{/ifEquals}}

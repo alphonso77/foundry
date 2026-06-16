@@ -1,0 +1,16 @@
+{{#ifIncludes integrations "hubspot"}}
+export interface HubSpotConfig {
+  apiKey: string;
+}
+
+export function loadHubSpotConfig(): HubSpotConfig {
+  const apiKey = process.env.HUBSPOT_API_KEY;
+  if (!apiKey) {
+    throw new Error('HUBSPOT_API_KEY is not set');
+  }
+  return { apiKey };
+}
+{{else}}
+// HubSpot integration not enabled for this service.
+export {};
+{{/ifIncludes}}

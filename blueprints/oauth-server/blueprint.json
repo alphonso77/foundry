@@ -1,0 +1,94 @@
+{
+  "id": "oauth-server",
+  "name": "OAuth Server",
+  "version": "0.1.0",
+  "description": "Production-ready OAuth 2.0 authorization server scaffold: Express + TypeScript with access/refresh token flows, optional PKCE, Postgres persistence, Dockerfile, AWS ECS Terraform skeleton, and GitHub Actions CI/CD.",
+  "deployTarget": "aws-ecs",
+  "inputs": {
+    "fields": [
+      {
+        "key": "serviceName",
+        "label": "Service name",
+        "type": "string",
+        "required": true,
+        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+        "placeholder": "my-oauth-server",
+        "help": "Lowercase kebab-case identifier used for the package name, Docker image, and infra resources."
+      },
+      {
+        "key": "tokenStrategy",
+        "label": "Token strategy",
+        "type": "select",
+        "default": "local-jwt",
+        "required": true,
+        "help": "How tokens are issued. Local JWT mints tokens in-process; External IdP exchanges codes against an upstream provider.",
+        "options": [
+          { "value": "local-jwt", "label": "Local JWT generation" },
+          { "value": "external-idp", "label": "External IdP backing" }
+        ]
+      },
+      {
+        "key": "pkce",
+        "label": "PKCE support",
+        "type": "boolean",
+        "default": true,
+        "help": "Enable Proof Key for Code Exchange (RFC 7636) on the authorization code flow."
+      },
+      {
+        "key": "integrations",
+        "label": "Integrations to wire up",
+        "type": "multiselect",
+        "default": [],
+        "help": "Optional third-party integration stubs to scaffold (config loaders, not full SDK wiring).",
+        "options": [
+          { "value": "stripe", "label": "Stripe" },
+          { "value": "salesforce", "label": "Salesforce" },
+          { "value": "hubspot", "label": "HubSpot" }
+        ]
+      },
+      {
+        "key": "datastore",
+        "label": "Datastore",
+        "type": "select",
+        "default": "postgres",
+        "required": true,
+        "help": "Backing datastore for clients, authorization codes, and refresh tokens.",
+        "options": [
+          { "value": "postgres", "label": "PostgreSQL" }
+        ]
+      },
+      {
+        "key": "apiDocs",
+        "label": "Interactive API docs",
+        "type": "boolean",
+        "default": true,
+        "help": "Serve an interactive Swagger UI at /docs for testing the OAuth + PKCE flows in-browser."
+      }
+    ]
+  },
+  "files": [
+    "package.json.hbs",
+    "tsconfig.json",
+    "README.md.hbs",
+    ".env.example.hbs",
+    ".gitignore",
+    "Dockerfile",
+    "src/index.ts.hbs",
+    "src/app.ts.hbs",
+    "src/config.ts.hbs",
+    "src/auth/routes.ts.hbs",
+    "src/auth/tokens.ts.hbs",
+    "src/auth/pkce.ts.hbs",
+    "src/openapi.ts.hbs",
+    "src/db/pool.ts",
+    "src/db/migrate.ts",
+    "src/db/schema.sql",
+    "src/integrations/index.ts.hbs",
+    "src/integrations/stripe.ts.hbs",
+    "src/integrations/salesforce.ts.hbs",
+    "src/integrations/hubspot.ts.hbs",
+    "infra/main.tf.hbs",
+    "infra/variables.tf",
+    ".github/workflows/ci.yml"
+  ]
+}

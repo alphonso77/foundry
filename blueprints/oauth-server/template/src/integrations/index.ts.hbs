@@ -1,0 +1,25 @@
+// Integration registry for {{serviceName}}.
+// Each enabled integration contributes a typed config object loaded from the environment.
+{{#ifIncludes integrations "stripe"}}
+import { loadStripeConfig } from './stripe';
+{{/ifIncludes}}
+{{#ifIncludes integrations "salesforce"}}
+import { loadSalesforceConfig } from './salesforce';
+{{/ifIncludes}}
+{{#ifIncludes integrations "hubspot"}}
+import { loadHubSpotConfig } from './hubspot';
+{{/ifIncludes}}
+
+export function loadIntegrations(): Record<string, unknown> {
+  const integrations: Record<string, unknown> = {};
+{{#ifIncludes integrations "stripe"}}
+  integrations.stripe = loadStripeConfig();
+{{/ifIncludes}}
+{{#ifIncludes integrations "salesforce"}}
+  integrations.salesforce = loadSalesforceConfig();
+{{/ifIncludes}}
+{{#ifIncludes integrations "hubspot"}}
+  integrations.hubspot = loadHubSpotConfig();
+{{/ifIncludes}}
+  return integrations;
+}

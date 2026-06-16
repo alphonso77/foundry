@@ -1,0 +1,32 @@
+{
+  "name": "foundry",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Foundry — web portal for bootstrapping production-ready Node/Express services from blueprints.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @foundry/server",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.13.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.11.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

@@ -1,0 +1,31 @@
+import path from 'node:path';
+
+export interface ServerConfig {
+  port: number;
+  authDisabled: boolean;
+  corsOrigin: string;
+  blueprintsDir: string;
+}
+
+/**
+ * Resolve runtime config from the environment, with dev-friendly defaults that
+ * match `.env.example`.
+ */
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+  return {
+    port: Number(env.SERVER_PORT ?? 4000),
+    // Default-on bypass for local dev. Anything other than the literal "false"
+    // keeps auth disabled — flipping it to "false" arms the (stub) real check.
+    authDisabled: (env.AUTH_DISABLED ?? 'true').toLowerCase() !== 'false',
+    corsOrigin: env.PORTAL_ORIGIN ?? 'http://localhost:5173',
+    blueprintsDir: env.FOUNDRY_BLUEPRINTS_DIR ?? defaultBlueprintsDir(),
+  };
+}
+
+/**
+ * <repo>/blueprints, resolved relative to this file (packages/server/src) so it
+ * works regardless of the cwd a workspace script runs from.
+ */
+function defaultBlueprintsDir(): string {
+  return path.resolve(import.meta.dirname, '..', '..', '..', 'blueprints');
+}

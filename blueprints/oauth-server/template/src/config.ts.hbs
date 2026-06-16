@@ -1,0 +1,29 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+export const config = {
+  serviceName: '{{serviceName}}',
+  port: Number(process.env.PORT ?? 3000),
+  issuer: process.env.OAUTH_ISSUER ?? 'https://auth.example.com',
+  databaseUrl:
+    process.env.DATABASE_URL ??
+    'postgres://postgres:postgres@localhost:5432/{{kebabCase serviceName}}',
+{{#ifEquals tokenStrategy "local-jwt"}}
+  jwtSecret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
+  accessTokenTtlSeconds: Number(process.env.ACCESS_TOKEN_TTL_SECONDS ?? 900),
+  refreshTokenTtlSeconds: Number(process.env.REFRESH_TOKEN_TTL_SECONDS ?? 2592000),
+{{else}}
+  idpIssuer: process.env.IDP_ISSUER ?? 'https://idp.example.com',
+  idpClientId: required('IDP_CLIENT_ID'),
+  idpClientSecret: required('IDP_CLIENT_SECRET'),
+{{/ifEquals}}
+};

@@ -1,0 +1,18 @@
+{{#ifIncludes integrations "salesforce"}}
+export interface SalesforceConfig {
+  clientId: string;
+  clientSecret: string;
+}
+
+export function loadSalesforceConfig(): SalesforceConfig {
+  const clientId = process.env.SALESFORCE_CLIENT_ID;
+  const clientSecret = process.env.SALESFORCE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('SALESFORCE_CLIENT_ID and SALESFORCE_CLIENT_SECRET must be set');
+  }
+  return { clientId, clientSecret };
+}
+{{else}}
+// Salesforce integration not enabled for this service.
+export {};
+{{/ifIncludes}}

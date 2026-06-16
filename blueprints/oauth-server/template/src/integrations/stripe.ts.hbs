@@ -1,0 +1,16 @@
+{{#ifIncludes integrations "stripe"}}
+export interface StripeConfig {
+  apiKey: string;
+}
+
+export function loadStripeConfig(): StripeConfig {
+  const apiKey = process.env.STRIPE_API_KEY;
+  if (!apiKey) {
+    throw new Error('STRIPE_API_KEY is not set');
+  }
+  return { apiKey };
+}
+{{else}}
+// Stripe integration not enabled for this service.
+export {};
+{{/ifIncludes}}

@@ -1,0 +1,50 @@
+import { randomUUID } from 'crypto';
+import { config } from '../config';
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: 'Bearer';
+  expiresIn: number;
+}
+
+{{#ifEquals tokenStrategy "local-jwt"}}
+import jwt from 'jsonwebtoken';
+
+export function issueTokens(subject: string, scope: string[]): TokenPair {
+  const accessToken = jwt.sign(
+    { scope, type: 'access' },
+    config.jwtSecret,
+    { subject, issuer: config.issuer, expiresIn: config.accessTokenTtlSeconds },
+  );
+  const refreshToken = jwt.sign(
+    { type: 'refresh', jti: randomUUID() },
+    config.jwtSecret,
+    { subject, issuer: config.issuer, expiresIn: config.refreshTokenTtlSeconds },
+  );
+  return {
+    accessToken,
+    refreshToken,
+    tokenType: 'Bearer',
+    expiresIn: config.accessTokenTtlSeconds,
+  };
+}
+
+export function verifyToken(token: string): jwt.JwtPayload {
+  const decoded = jwt.verify(token, config.jwtSecret, { issuer: config.issuer });
+  if (typeof decoded === 'string') {
+    throw new Error('Unexpected string token payload');
+  }
+  return decoded;
+}
+{{else}}
+// External IdP token strategy: this service does not mint tokens itself.
+// Tokens are issued by the upstream IdP (config.idpIssuer); we exchange codes for them.
+export async function exchangeAuthorizationCode(code: string): Promise<TokenPair> {
+  // Integration point: POST to `${config.idpIssuer}/oauth/token` with
+  // config.idpClientId / config.idpClientSecret. Stubbed for the prototype.
+  throw new Error(
+    `External IdP exchange not implemented (issuer=${config.idpIssuer}, code=${code}, nonce=${randomUUID()})`,
+  );
+}
+{{/ifEquals}}
