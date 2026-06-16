@@ -14,6 +14,16 @@ blueprints/          template payload — NOT part of Foundry's build   (Gamma)
 
 > **Boundary:** `blueprints/**` is template payload (it contains `{{handlebars}}` and intentionally-partial source). It is excluded from workspaces, tsconfig, ESLint, Prettier, and Vitest — Foundry's own tooling never compiles it. The generator reads it at runtime via `FolderResolver`.
 
+## Status
+
+- [x] **M0** — OAuth blueprint generates a buildable project; single-output ZIP download
+- [x] **M1** — Portal UI: list → configure → generate → download; dockerized local dev; Swagger UI at `/docs` with PKCE pre-wired
+- [ ] **M2** *(if time)* — Dogfood OAuth: secure the portal with the OAuth blueprint
+- [ ] **M3** *(if time)* — Deploy-from-portal to AWS
+- [ ] **M4** *(if time)* — New repo per generation; second blueprint; self-host capstone
+
+Full feature-level breakdown: [`docs/PROGRESS.md`](./docs/PROGRESS.md)
+
 ## Develop
 
 ```bash
