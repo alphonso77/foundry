@@ -18,9 +18,9 @@ blueprints/          template payload — NOT part of Foundry's build   (Gamma)
 
 - [x] **M0** — OAuth blueprint generates a buildable project; single-output ZIP download
 - [x] **M1** — Portal UI: list → configure → generate → download; dockerized local dev; Swagger UI at `/docs` with PKCE pre-wired
-- [ ] **M2** *(if time)* — Dogfood OAuth: secure the portal with the OAuth blueprint
-- [ ] **M3** *(if time)* — Deploy-from-portal to AWS
-- [ ] **M4** *(if time)* — New repo per generation; second blueprint; self-host capstone
+- [ ] **M2** — Dogfood OAuth: secure the portal with the OAuth blueprint
+- [ ] **M3** — Deploy-from-portal to AWS
+- [ ] **M4** — New repo per generation; second blueprint; self-host capstone
 
 Full feature-level breakdown: [`docs/PROGRESS.md`](./docs/PROGRESS.md)
 
