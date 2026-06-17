@@ -16,3 +16,9 @@ apps/**/dist/
 
 # tsbuildinfo
 *.tsbuildinfo
+
+# Dev-loop harness scratch output (scripts/gen-and-run.ts)
+.scratch/
+
+# Editor-local settings (personal SQLTools connections, etc.)
+.vscode/

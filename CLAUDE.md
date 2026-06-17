@@ -7,6 +7,7 @@ Foundry generates production-ready Node/Express services from **blueprints** (pi
 - `npm run dev` — API on :4000 (tsx watch; source-only TS, no build step)
 - `npm test` — Vitest (generator + server) · `npm run typecheck` · `npm run lint`
 - `docker compose up` — full topology (portal :5173 + API :4000 + Postgres), auth bypassed
+- `npm run gen:oauth` — dev-loop harness: generate the OAuth blueprint into `.scratch/` → install → `db:init` → run (against the compose Postgres). `-- --help` for flags. Dev-only; drives the generator programmatically.
 
 ## Layout
 - `packages/shared` (`@foundry/shared`) — contract types: the single source of truth (interfaces + HTTP DTOs).
@@ -17,7 +18,7 @@ Foundry generates production-ready Node/Express services from **blueprints** (pi
 
 ## Invariants (don't break these)
 1. **The generator talks only to `BlueprintResolver`** — never to the filesystem/storage layout. New storage backends (git-ref, package) are new resolver impls; the generator stays untouched. This ports-and-adapters boundary is the core design.
-2. **`blueprints/**` is template payload, not Foundry source.** It contains `{{handlebars}}` and intentionally-partial code; it's excluded from workspaces, tsconfig, ESLint, Prettier, and Vitest. Never make Foundry's own tooling compile it. Verify a blueprint by generating → `npm install && npx tsc --noEmit` in the *output*, not by linting templates.
+2. **`blueprints/**` is template payload, not Foundry source.** It contains `{{handlebars}}` and intentionally-partial code; it's excluded from workspaces, tsconfig, ESLint, Prettier, and Vitest. Never make Foundry's own tooling compile it. Verify a blueprint by generating → `npm install && npx tsc --noEmit` in the *output*, not by linting templates. (The `gen:oauth` harness emits generated output to `.scratch/` — gitignored and ESLint-ignored, same rationale.)
 3. **Handlebars helpers are a fixed contract:** `ifEquals`, `ifIncludes`, `kebabCase`, `pascalCase`, `camelCase` — only these. `packages/generator/src/helpers.ts` and blueprint templates must agree; never add a helper on one side only.
 4. **`InputSchema` is the single source of truth** for both portal form rendering and generator validation. A blueprint's `inputs` drives the UI and the 400-on-invalid-config check. Field types: `string` (+`pattern`), `boolean`, `select`, `multiselect`.
 5. **Defaults resolve before validation.** `required` means "has a value *after* defaults applied" — a field with a `default` always satisfies `required` (see `Generator.generate`).
@@ -28,4 +29,4 @@ Foundry generates production-ready Node/Express services from **blueprints** (pi
 - Gate optional content with `{{#ifEquals key true}}` / `{{#ifIncludes arr "x"}}`. For conditional deps in a generated `package.json.hbs`, mind JSON comma placement (leading comma for last-position entries).
 
 ## Auth
-`AUTH_DISABLED=true` (dev) opens all routes; the enabled branch in `packages/server/src/auth.ts` is the seam where a real OAuth/IdP check slots in (the OAuth blueprint is intended to eventually secure the portal — dogfooding). No real IdP is wired yet.
+`AUTH_DISABLED=true` (dev) opens all routes; the enabled branch in `packages/server/src/auth.ts` is the seam where a real OAuth/IdP check slots in (the OAuth blueprint is intended to eventually secure the portal — dogfooding). The OAuth blueprint now *generates* a functionally-complete, Postgres-backed IdP (authorization-code + PKCE), but it is not yet wired in front of the portal — that's M2.
