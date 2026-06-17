@@ -177,6 +177,6 @@ Rationale: a first blueprint should validate generation in isolation, not confla
 
 1. **M0** — OAuth Server blueprint generates a working project locally; single-output download. Generator reads from the blueprint manifest.
 2. **M1** — Portal UI: select blueprint → configure → generate → download. Portal runs in dockerized local/dev mode with auth bypassed. The generated OAuth project ships an interactive Swagger UI (`/docs`) with the PKCE flow pre-wired, so a developer can exercise the token + PKCE flows in-browser immediately after generating.
-3. **M2** *(if time)* — Dogfood OAuth: secure the portal with the OAuth blueprint (bypass flag remains for local/dev).
-4. **M3** *(if time)* — Deploy-from-portal to AWS.
-5. **M4** *(if time)* — New repo per generation; second real blueprint (proves the abstraction generalizes); self-host blueprint as the eventual capstone (see Blueprint Sequencing).
+3. **M2** — Dogfood OAuth: secure the portal with the OAuth blueprint (bypass flag remains for local/dev).
+4. **M3** — Deploy-from-portal to AWS.
+5. **M4** — New repo per generation; second real blueprint (proves the abstraction generalizes); self-host blueprint as the eventual capstone (see Blueprint Sequencing).

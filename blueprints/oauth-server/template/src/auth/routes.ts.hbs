@@ -1,4 +1,6 @@
+import { randomBytes } from 'crypto';
 import { Router, Request, Response } from 'express';
+import { pool } from '../db/pool';
 {{#ifEquals pkce true}}
 import { verifyPkce } from './pkce';
 {{/ifEquals}}
@@ -10,61 +12,156 @@ import { exchangeAuthorizationCode } from './tokens';
 
 export const oauthRouter = Router();
 
-// In-memory authorization code store (prototype only — production persists to Postgres).
-interface AuthCodeRecord {
-  subject: string;
-  scope: string[];
-  codeChallenge?: string;
+// Redirect to redirect_uri with an error code per RFC 6749 §4.1.2.1.
+// Only call this after redirect_uri has been validated — never redirect to an untrusted URI.
+function redirectWithError(res: Response, redirectUri: string, error: string, state?: string): void {
+  const url = new URL(redirectUri);
+  url.searchParams.set('error', error);
+  if (state) url.searchParams.set('state', state);
+  res.redirect(url.toString());
 }
-const authCodes = new Map<string, AuthCodeRecord>();
 
 /**
- * GET /oauth/authorize — issues a short-lived authorization code.
+ * GET /oauth/authorize — RFC 6749 §4.1.1
+ *
+ * Validates the client and redirect_uri, issues a short-lived authorization code,
+ * and redirects the user-agent back to redirect_uri with the code attached.
  */
-oauthRouter.get('/authorize', (req: Request, res: Response) => {
-  const clientId = String(req.query.client_id ?? '');
-  if (!clientId) {
-    return res
-      .status(400)
-      .json({ error: 'invalid_request', error_description: 'client_id is required' });
-  }
-  const scope = String(req.query.scope ?? '')
-    .split(' ')
-    .filter(Boolean);
-
-  const code = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  const record: AuthCodeRecord = { subject: clientId, scope };
+oauthRouter.get('/authorize', async (req: Request, res: Response) => {
+  const responseType = String(req.query.response_type ?? '');
+  const clientId     = String(req.query.client_id ?? '');
+  const redirectUri  = req.query.redirect_uri ? String(req.query.redirect_uri) : undefined;
+  const scope        = String(req.query.scope ?? '').split(' ').filter(Boolean);
+  const state        = req.query.state ? String(req.query.state) : undefined;
 {{#ifEquals pkce true}}
-  if (req.query.code_challenge) {
-    record.codeChallenge = String(req.query.code_challenge);
+  const codeChallenge       = req.query.code_challenge ? String(req.query.code_challenge) : undefined;
+  const codeChallengeMethod = req.query.code_challenge_method ? String(req.query.code_challenge_method) : undefined;
+{{/ifEquals}}
+
+  if (responseType !== 'code') {
+    return res.status(400).json({ error: 'unsupported_response_type' });
+  }
+  if (!clientId) {
+    return res.status(400).json({ error: 'invalid_request', error_description: 'client_id is required' });
+  }
+
+  // Validate client and redirect_uri before issuing any redirect (RFC 6749 §4.1.2.1).
+  let clientRow: { redirect_uris: string[] } | undefined;
+  try {
+    const result = await pool.query<{ redirect_uris: string[] }>(
+      'SELECT redirect_uris FROM oauth_clients WHERE client_id = $1',
+      [clientId],
+    );
+    clientRow = result.rows[0];
+  } catch {
+    return res.status(500).json({ error: 'server_error' });
+  }
+
+  if (!clientRow) {
+    return res.status(400).json({ error: 'invalid_client' });
+  }
+
+  const registeredUris = clientRow.redirect_uris;
+
+  // RFC 6749 §3.1.2.3: if redirect_uri is omitted and exactly one is registered, use it.
+  // If provided, it must exactly match a registered value.
+  let resolvedRedirectUri: string;
+  if (!redirectUri) {
+    if (registeredUris.length !== 1) {
+      return res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri is required' });
+    }
+    resolvedRedirectUri = registeredUris[0];
+  } else {
+    if (!registeredUris.includes(redirectUri)) {
+      return res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri mismatch' });
+    }
+    resolvedRedirectUri = redirectUri;
+  }
+
+  // redirect_uri is now trusted — errors from here on redirect back to the client.
+{{#ifEquals pkce true}}
+  // PKCE is required (RFC 7636 §4.3).
+  if (!codeChallenge) {
+    return redirectWithError(res, resolvedRedirectUri, 'invalid_request', state);
+  }
+  if (codeChallengeMethod !== 'S256') {
+    return redirectWithError(res, resolvedRedirectUri, 'invalid_request', state);
   }
 {{/ifEquals}}
-  authCodes.set(code, record);
-  return res.json({ code });
+
+  // Generate a cryptographically random authorization code (RFC 6749 §10.10).
+  const code      = randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10-minute window per §4.1.2
+
+  // subject: the authenticated principal. This prototype has no user login step, so
+  // client_id is used as the subject. A real implementation replaces this with the
+  // authenticated user's identifier after a login/consent screen.
+  try {
+    await pool.query(
+      `INSERT INTO authorization_codes
+         (code, client_id, subject, scope, code_challenge, redirect_uri, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+{{#ifEquals pkce true}}
+      [code, clientId, clientId, scope, codeChallenge, resolvedRedirectUri, expiresAt],
+{{else}}
+      [code, clientId, clientId, scope, null, resolvedRedirectUri, expiresAt],
+{{/ifEquals}}
+    );
+  } catch {
+    return redirectWithError(res, resolvedRedirectUri, 'server_error', state);
+  }
+
+  // Redirect with code (and state echo-back for CSRF protection — RFC 6749 §4.1.2).
+  const location = new URL(resolvedRedirectUri);
+  location.searchParams.set('code', code);
+  if (state) location.searchParams.set('state', state);
+  return res.redirect(location.toString());
 });
 
 /**
- * POST /oauth/token — exchanges an authorization code (or refresh token) for tokens.
+ * POST /oauth/token — RFC 6749 §4.1.3 (authorization_code) / §6 (refresh_token)
  */
 oauthRouter.post('/token', async (req: Request, res: Response) => {
   const grantType = String(req.body?.grant_type ?? '');
 
 {{#ifEquals tokenStrategy "local-jwt"}}
   if (grantType === 'authorization_code') {
-    const code = String(req.body?.code ?? '');
-    const record = authCodes.get(code);
+    const code        = String(req.body?.code ?? '');
+    const redirectUri = req.body?.redirect_uri ? String(req.body.redirect_uri) : undefined;
+{{#ifEquals pkce true}}
+    const codeVerifier = String(req.body?.code_verifier ?? '');
+{{/ifEquals}}
+
+    // Consume the authorization code atomically — deleted on retrieval (one-time use, RFC 6749 §4.1.2).
+    let record: { subject: string; scope: string[]; code_challenge: string | null; redirect_uri: string | null } | undefined;
+    try {
+      const result = await pool.query(
+        `DELETE FROM authorization_codes
+         WHERE code = $1 AND expires_at > now()
+         RETURNING subject, scope, code_challenge, redirect_uri`,
+        [code],
+      );
+      record = result.rows[0];
+    } catch {
+      return res.status(500).json({ error: 'server_error' });
+    }
+
     if (!record) {
       return res.status(400).json({ error: 'invalid_grant' });
     }
+
+    // RFC 6749 §4.1.3: redirect_uri MUST match what was used in the authorization request.
+    if (record.redirect_uri && redirectUri !== record.redirect_uri) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' });
+    }
+
 {{#ifEquals pkce true}}
-    const codeVerifier = String(req.body?.code_verifier ?? '');
-    if (record.codeChallenge && !verifyPkce(codeVerifier, record.codeChallenge)) {
-      return res
-        .status(400)
-        .json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
+    // RFC 7636 §4.6: verify code_verifier against stored code_challenge.
+    if (record.code_challenge && !verifyPkce(codeVerifier, record.code_challenge)) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
     }
 {{/ifEquals}}
-    authCodes.delete(code);
+
     return res.json(issueTokens(record.subject, record.scope));
   }
 
@@ -72,7 +169,9 @@ oauthRouter.post('/token', async (req: Request, res: Response) => {
     const refreshToken = String(req.body?.refresh_token ?? '');
     try {
       const payload = verifyToken(refreshToken);
-      return res.json(issueTokens(String(payload.sub ?? ''), []));
+      // Carry original scopes forward — issuing with [] would silently drop them (RFC 6749 §6).
+      const scope = Array.isArray(payload.scope) ? (payload.scope as string[]) : [];
+      return res.json(issueTokens(String(payload.sub ?? ''), scope));
     } catch {
       return res.status(400).json({ error: 'invalid_grant' });
     }
@@ -85,9 +184,7 @@ oauthRouter.post('/token', async (req: Request, res: Response) => {
     try {
       return res.json(await exchangeAuthorizationCode(code));
     } catch (err) {
-      return res
-        .status(400)
-        .json({ error: 'invalid_grant', error_description: String(err) });
+      return res.status(400).json({ error: 'invalid_grant', error_description: String(err) });
     }
   }
 

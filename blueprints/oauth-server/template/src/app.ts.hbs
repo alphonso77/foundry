@@ -30,10 +30,14 @@ export function createApp(): express.Express {
     swaggerUi.serve,
     swaggerUi.setup(openapiDocument, {
       swaggerOptions: {
-{{#ifEquals pkce true}}
-        usePkceWithAuthorizationCodeGrant: true,
-{{/ifEquals}}
         persistAuthorization: true,
+        oauth: {
+          clientId: '{{kebabCase serviceName}}-client',
+          scopes: 'openid',
+{{#ifEquals pkce true}}
+          usePkceWithAuthorizationCodeGrant: true,
+{{/ifEquals}}
+        },
       },
     }),
   );

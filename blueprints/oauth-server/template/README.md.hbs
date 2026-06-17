@@ -1,6 +1,6 @@
 # {{serviceName}}
 
-An OAuth 2.0 authorization server scaffolded by [Foundry](https://github.com/fratelli/foundry).
+An OAuth 2.0 authorization server scaffolded by [Foundry](https://github.com/alphonso77/foundry).
 
 - **Token strategy:** `{{tokenStrategy}}`
 - **PKCE:** {{#ifEquals pkce true}}enabled{{else}}disabled{{/ifEquals}}
@@ -12,7 +12,7 @@ An OAuth 2.0 authorization server scaffolded by [Foundry](https://github.com/fra
 ```bash
 npm install
 cp .env.example .env   # then fill in secrets
-npm run migrate        # apply the Postgres schema
+npm run db:init        # drop (if exists), create, and migrate the Postgres schema
 npm run dev            # start the server on PORT (default 3000)
 ```
 

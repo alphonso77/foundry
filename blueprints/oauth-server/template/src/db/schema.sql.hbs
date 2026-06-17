@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS authorization_codes (
   subject        TEXT NOT NULL,
   scope          TEXT[] NOT NULL DEFAULT '{}',
   code_challenge TEXT,
+  redirect_uri   TEXT,
   expires_at     TIMESTAMPTZ NOT NULL,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -28,3 +29,12 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_subject ON refresh_tokens(subject);
 CREATE INDEX IF NOT EXISTS idx_auth_codes_client ON authorization_codes(client_id);
+
+-- Default dev client. redirect_uris matches Swagger UI's built-in oauth2-redirect handler.
+-- Update redirect_uris if you change PORT or deploy to a non-localhost environment.
+INSERT INTO oauth_clients (client_id, client_secret, redirect_uris)
+VALUES (
+  '{{kebabCase serviceName}}-client',
+  NULL,
+  ARRAY['http://localhost:3000/docs/oauth2-redirect.html']
+) ON CONFLICT (client_id) DO NOTHING;

@@ -17,11 +17,14 @@ export const openapiDocument = {
   paths: {
     '/oauth/authorize': {
       get: {
-        summary: 'Authorization endpoint — issues a short-lived authorization code.',
+        summary: 'Authorization endpoint — validates the client and redirects with an authorization code.',
         tags: ['oauth'],
         parameters: [
+          { name: 'response_type', in: 'query', required: true, schema: { type: 'string', enum: ['code'] } },
           { name: 'client_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'redirect_uri', in: 'query', required: false, schema: { type: 'string' }, description: 'Must match a URI registered for the client.' },
           { name: 'scope', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'state', in: 'query', required: false, schema: { type: 'string' }, description: 'Opaque value echoed back to prevent CSRF (RFC 6749 §10.12).' },
 {{#ifEquals pkce true}}
           {
             name: 'code_challenge',
@@ -40,15 +43,11 @@ export const openapiDocument = {
 {{/ifEquals}}
         ],
         responses: {
-          '200': {
-            description: 'Authorization code issued.',
-            content: {
-              'application/json': {
-                schema: { type: 'object', properties: { code: { type: 'string' } } },
-              },
-            },
+          '302': {
+            description: 'Redirect to redirect_uri with ?code=&state= appended (RFC 6749 §4.1.2).',
+            headers: { Location: { schema: { type: 'string' } } },
           },
-          '400': { description: 'Invalid request.' },
+          '400': { description: 'Invalid client, mismatched redirect_uri, or bad request.' },
         },
       },
     },
@@ -92,10 +91,10 @@ export const openapiDocument = {
                 schema: {
                   type: 'object',
                   properties: {
-                    accessToken: { type: 'string' },
-                    refreshToken: { type: 'string' },
-                    tokenType: { type: 'string' },
-                    expiresIn: { type: 'integer' },
+                    access_token: { type: 'string' },
+                    refresh_token: { type: 'string' },
+                    token_type: { type: 'string' },
+                    expires_in: { type: 'integer' },
                   },
                 },
               },
@@ -110,7 +109,11 @@ export const openapiDocument = {
     securitySchemes: {
       oauth2AuthorizationCode: {
         type: 'oauth2',
-        description: 'OAuth 2.0 Authorization Code flow{{#ifEquals pkce true}} with PKCE{{/ifEquals}}.',
+        description:
+          'OAuth 2.0 Authorization Code flow{{#ifEquals pkce true}} with PKCE (RFC 7636){{/ifEquals}}. ' +
+          '**Dev client (seeded by migration):** ' +
+          '`client_id` = `{{kebabCase serviceName}}-client` · ' +
+          'no `client_secret` (public client{{#ifEquals pkce true}}, PKCE replaces the secret{{/ifEquals}}).',
         flows: {
           authorizationCode: {
             authorizationUrl: '/oauth/authorize',
