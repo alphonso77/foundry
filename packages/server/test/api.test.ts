@@ -1,19 +1,33 @@
 import path from 'node:path';
 import JSZip from 'jszip';
+import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { FolderResolver, Generator } from '@foundry/generator';
 import { createApp } from '../src/app.js';
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures', 'blueprints');
+const JWT_SECRET = 'test-secret';
+const ISSUER = 'https://auth.test';
 
-function app() {
+function app(overrides: { authDisabled?: boolean } = {}) {
   const resolver = new FolderResolver(FIXTURES);
   return createApp({
     resolver,
     generator: new Generator(resolver),
-    authDisabled: true,
+    authDisabled: overrides.authDisabled ?? true,
     corsOrigin: 'http://localhost:5173',
+    oauthJwtSecret: JWT_SECRET,
+    oauthIssuer: ISSUER,
+  });
+}
+
+/** Mint a token the way the IdP's `issueTokens` does (subject + issuer + type). */
+function token(type: 'access' | 'refresh', opts: { secret?: string; issuer?: string } = {}) {
+  return jwt.sign({ scope: ['read'], type }, opts.secret ?? JWT_SECRET, {
+    subject: 'demo-client',
+    issuer: opts.issuer ?? ISSUER,
+    expiresIn: 900,
   });
 }
 
@@ -108,16 +122,52 @@ describe('POST /api/generate', () => {
   });
 });
 
-describe('auth shim', () => {
-  it('blocks requests when auth is enabled (no IdP configured)', async () => {
-    const resolver = new FolderResolver(FIXTURES);
-    const guarded = createApp({
-      resolver,
-      generator: new Generator(resolver),
-      authDisabled: false,
-      corsOrigin: 'http://localhost:5173',
-    });
-    const res = await request(guarded).get('/api/blueprints');
+describe('auth (real bearer verification when enabled)', () => {
+  it('401s with no Authorization header', async () => {
+    const res = await request(app({ authDisabled: false })).get('/api/blueprints');
     expect(res.status).toBe(401);
+    expect(res.body.error).toBe('invalid_token');
+    expect(res.headers['www-authenticate']).toContain('Bearer');
+  });
+
+  it('401s on a garbage token', async () => {
+    const res = await request(app({ authDisabled: false }))
+      .get('/api/blueprints')
+      .set('Authorization', 'Bearer not-a-jwt');
+    expect(res.status).toBe(401);
+  });
+
+  it('401s on a token signed with the wrong secret', async () => {
+    const res = await request(app({ authDisabled: false }))
+      .get('/api/blueprints')
+      .set('Authorization', `Bearer ${token('access', { secret: 'other-secret' })}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('401s on a wrong-issuer token', async () => {
+    const res = await request(app({ authDisabled: false }))
+      .get('/api/blueprints')
+      .set('Authorization', `Bearer ${token('access', { issuer: 'https://evil.test' })}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('401s when a refresh token is replayed as a bearer', async () => {
+    const res = await request(app({ authDisabled: false }))
+      .get('/api/blueprints')
+      .set('Authorization', `Bearer ${token('refresh')}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('200s with a valid access token', async () => {
+    const res = await request(app({ authDisabled: false }))
+      .get('/api/blueprints')
+      .set('Authorization', `Bearer ${token('access')}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toBeInstanceOf(Array);
+  });
+
+  it('opens all routes when auth is disabled (dev default)', async () => {
+    const res = await request(app({ authDisabled: true })).get('/api/blueprints');
+    expect(res.status).toBe(200);
   });
 });

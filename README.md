@@ -19,7 +19,7 @@ blueprints/          template payload — NOT part of Foundry's build   (Gamma)
 - [x] **M0** — OAuth blueprint generates a buildable project; single-output ZIP download
 - [x] **M1** — Portal UI: list → configure → generate → download; dockerized local dev; Swagger UI at `/docs` with PKCE pre-wired
 - [x] **M1.5** — M2 enablement: generated OAuth server is a functionally-complete, Postgres-persisted auth-code + PKCE IdP; one-command dev-loop harness (`npm run gen:oauth`)
-- [ ] **M2** — Dogfood OAuth: secure the portal with the OAuth blueprint
+- [x] **M2** — Dogfood OAuth: secure the portal with the OAuth blueprint (client-level; bypass flag remains for local/dev)
 - [ ] **M3** — Deploy-from-portal to AWS
 - [ ] **M4** — New repo per generation; second blueprint; self-host capstone
 

@@ -40,6 +40,18 @@ const DEFAULT_PG = 'postgres://foundry:foundry@localhost:5432';
 const DEFAULT_SERVICE_NAME = 'dev-oauth';
 const DEFAULT_PORT = 3000; // matches the blueprint's seeded Swagger redirect URI
 
+// ── Portal dogfood (M2) defaults ─────────────────────────────────────────────
+// The shared JWT signing config the Foundry portal API also defaults to (see
+// packages/server/src/config.ts) — the IdP and the portal must agree on these
+// for the portal to verify IdP-issued tokens. They equal the blueprint's own
+// config.ts.hbs defaults; we set them explicitly so the seam is visible.
+const SHARED_JWT_SECRET = 'dev-secret-change-me';
+const SHARED_OAUTH_ISSUER = 'https://auth.example.com';
+// The IdP registers Foundry's portal as an OAuth client via the env-driven seed
+// (SEED_CLIENT_* — Beta's db-init feature). PKCE public client, Vite dev origin.
+const PORTAL_CLIENT_ID = 'foundry-portal';
+const PORTAL_REDIRECT_URIS = 'http://localhost:5173/callback';
+
 interface Options {
   out: string;
   port: number;
@@ -48,6 +60,7 @@ interface Options {
   install: boolean;
   db: boolean;
   run: boolean;
+  portalClient: boolean;
   config: Record<string, unknown>;
 }
 
@@ -59,6 +72,7 @@ function parseArgs(argv: string[]): Options {
     install: true,
     db: true,
     run: true,
+    portalClient: true,
     config: {},
   };
 
@@ -82,6 +96,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--no-run':
         opts.run = false;
+        break;
+      case '--no-portal-client':
+        opts.portalClient = false;
         break;
       case '--out':
         opts.out = resolve(REPO_ROOT, requireValue(arg, argv[++i]));
@@ -145,10 +162,19 @@ Flags:
   --no-install       Skip npm install entirely.
   --no-db            Skip "npm run db:init" (no Postgres needed).
   --no-run           Don't start the server (stop after install/db:init).
+  --no-portal-client Don't seed the Foundry portal as an OAuth client (M2).
   --out <dir>        Scratch output dir (default: .scratch/${BLUEPRINT_ID}).
   --port <n>         Server PORT (default: ${DEFAULT_PORT}).
   --db-url <url>     DATABASE_URL (default: ${DEFAULT_PG}/<serviceName>).
   --help, -h         Show this help.
+
+Portal dogfood (M2), on by default:
+  Sets JWT_SECRET=${SHARED_JWT_SECRET} and OAUTH_ISSUER=${SHARED_OAUTH_ISSUER}
+  (shared with the Foundry portal API) and seeds the portal OAuth client
+  (SEED_CLIENT_ID=${PORTAL_CLIENT_ID}, redirect ${PORTAL_REDIRECT_URIS}).
+  To verify the secured loop: run this IdP, then run the Foundry portal API with
+  AUTH_DISABLED=false (matching OAUTH_JWT_SECRET/OAUTH_ISSUER) and the SPA with
+  VITE_OAUTH_ENABLED=true. Each value is overridable via the caller's env.
 
 Default behavior: clean regenerate (wipe scratch) so template edits are picked up.`);
 }
@@ -246,6 +272,20 @@ async function main(): Promise<void> {
     // a bare run; harmless for the default local-jwt strategy.
     IDP_CLIENT_ID: process.env.IDP_CLIENT_ID ?? 'dev-idp-client',
     IDP_CLIENT_SECRET: process.env.IDP_CLIENT_SECRET ?? 'dev-idp-secret',
+    // ── Portal dogfood (M2) ─────────────────────────────────────────────────
+    // Default-on: share the JWT signing config with the Foundry portal API and
+    // seed the portal as an OAuth client so `db:init` registers it. The portal
+    // API (AUTH_DISABLED=false) then verifies tokens this IdP issues. Each is
+    // overridable from the caller's env. `--no-portal-client` skips the seed.
+    JWT_SECRET: process.env.JWT_SECRET ?? SHARED_JWT_SECRET,
+    OAUTH_ISSUER: process.env.OAUTH_ISSUER ?? SHARED_OAUTH_ISSUER,
+    ...(opts.portalClient
+      ? {
+          SEED_CLIENT_ID: process.env.SEED_CLIENT_ID ?? PORTAL_CLIENT_ID,
+          SEED_CLIENT_REDIRECT_URIS:
+            process.env.SEED_CLIENT_REDIRECT_URIS ?? PORTAL_REDIRECT_URIS,
+        }
+      : {}),
   };
 
   // 2. npm install (skipped on --no-install, or in --reuse when deps exist).
@@ -272,7 +312,11 @@ async function main(): Promise<void> {
   console.log(`\n▸ npm run dev  →  starting ${cfg.serviceName} on :${opts.port}
 ${docsEnabled ? `  Swagger UI : http://localhost:${opts.port}/docs\n` : ''}  authorize  : http://localhost:${opts.port}/oauth/authorize
   token      : http://localhost:${opts.port}/oauth/token
-  client_id  : ${clientId}
+  client_id  : ${clientId}${
+    opts.portalClient
+      ? `\n  portal client : ${PORTAL_CLIENT_ID} (redirect ${PORTAL_REDIRECT_URIS}) — M2 dogfood`
+      : ''
+  }
 `);
   await run('npm', ['run', 'dev'], opts.out, childEnv, /* okOnSignal */ true);
   console.log('\n✓ server stopped\n');

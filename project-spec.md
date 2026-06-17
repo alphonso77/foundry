@@ -161,6 +161,7 @@ How **Foundry itself** is provisioned and deployed — distinct from the IaC tha
 - **Generator output:** Download-only repo first. Deploy-from-portal is a later phase if time allows.
 - **Generated code location:** Single-output download first. New-repo-per-generation later if time allows.
 - **Portal auth:** Dogfood the OAuth blueprint to secure the portal — but support a dockerized local/dev mode that bypasses OAuth entirely (e.g. an `AUTH_DISABLED` / local-dev flag) so the portal runs without an IdP in development.
+- **M2 is a structural / dogfooding milestone, not a security boundary.** Identity is client-level (`subject = client_id`); the IdP has no per-user login or consent step and the portal is a public PKCE client. So the flow authenticates the *token* but not the *caller*: anyone who knows a valid `client_id` plus one of its registered (public) `redirect_uri`s can run the flow and mint a valid token. PKCE does not prevent this — it binds a code to whoever started the flow, but anyone can start one with their own verifier/challenge. What M2 *does* secure: forged tokens (HS256 signature + issuer + `type`/expiry are verified) and the previously wide-open `AUTH_DISABLED` door. **The real fix — user authentication + consent at `/authorize`, so a token's `sub` is an authenticated user — is deferred to the next milestone.** (Symmetric HS256 also couples portal and IdP to a shared secret; the documented upgrade is RS256 + a JWKS endpoint, likewise deferred.)
 
 ## Blueprint Sequencing
 

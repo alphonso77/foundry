@@ -203,3 +203,37 @@ oauthRouter.post('/token', async (req: Request, res: Response) => {
   return res.status(400).json({ error: 'unsupported_grant_type' });
 {{/ifEquals}}
 });
+{{#ifEquals tokenStrategy "local-jwt"}}
+
+/**
+ * GET /oauth/userinfo — protected resource returning the authenticated principal.
+ *
+ * Requires a valid access token (`Authorization: Bearer <token>`). This is the showcase
+ * endpoint for Swagger UI's Authorize button: once authorized, Execute auto-attaches the
+ * bearer token and returns identity — a two-click demo of the whole token flow.
+ *
+ * This prototype has no user login step, so the principal is the client (`sub === client_id`).
+ */
+oauthRouter.get('/userinfo', (req: Request, res: Response) => {
+  const [scheme, token] = String(req.headers.authorization ?? '').split(' ');
+  if (scheme !== 'Bearer' || !token) {
+    res.setHeader('WWW-Authenticate', 'Bearer error="invalid_token"');
+    return res.status(401).json({ error: 'invalid_token' });
+  }
+
+  try {
+    const payload = verifyToken(token);
+    // Reject a refresh token replayed as a bearer access token — same token-type guard the
+    // /token refresh branch uses (both are signed with the same secret/issuer).
+    if (payload.type !== 'access') {
+      res.setHeader('WWW-Authenticate', 'Bearer error="invalid_token"');
+      return res.status(401).json({ error: 'invalid_token' });
+    }
+    const scope = Array.isArray(payload.scope) ? (payload.scope as string[]) : [];
+    return res.json({ sub: payload.sub, client_id: payload.sub, scope });
+  } catch {
+    res.setHeader('WWW-Authenticate', 'Bearer error="invalid_token"');
+    return res.status(401).json({ error: 'invalid_token' });
+  }
+});
+{{/ifEquals}}

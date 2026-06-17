@@ -29,4 +29,24 @@ Foundry generates production-ready Node/Express services from **blueprints** (pi
 - Gate optional content with `{{#ifEquals key true}}` / `{{#ifIncludes arr "x"}}`. For conditional deps in a generated `package.json.hbs`, mind JSON comma placement (leading comma for last-position entries).
 
 ## Auth
-`AUTH_DISABLED=true` (dev) opens all routes; the enabled branch in `packages/server/src/auth.ts` is the seam where a real OAuth/IdP check slots in (the OAuth blueprint is intended to eventually secure the portal — dogfooding). The OAuth blueprint now *generates* a functionally-complete, Postgres-backed IdP (authorization-code + PKCE), but it is not yet wired in front of the portal — that's M2.
+The portal is dogfooded behind its own OAuth blueprint (M2). Two run modes:
+- **Bypassed (dev default):** `AUTH_DISABLED=true` opens all `/api` routes — what `docker compose up` runs.
+- **Armed:** `AUTH_DISABLED=false` makes `packages/server/src/auth.ts` verify a real bearer access token
+  from the generated IdP — HS256 signature + `OAUTH_ISSUER` + `type==='access'` (refresh-as-bearer
+  rejected). `OAUTH_JWT_SECRET`/`OAUTH_ISSUER` must equal the IdP's `JWT_SECRET`/`OAUTH_ISSUER` (local
+  defaults align).
+
+Secured loop is **host-side, not compose** (compose stays bypassed): `npm run gen:oauth` (IdP on :3000,
+seeds the `foundry-portal` client via `SEED_CLIENT_*`) · `AUTH_DISABLED=false npm run dev` (API) ·
+`VITE_OAUTH_ENABLED=true npm run dev -w @foundry/portal-web` (SPA runs auth-code + PKCE, attaches the
+bearer). See `docs/PROGRESS.md` → "M2 — secured portal loop".
+
+Identity is **client-level** (`subject = client_id`) — no per-user login/consent. This blocks forged
+tokens and accidental open access, but is a **structural/dogfooding** milestone, not a hardened boundary:
+anyone with the public `client_id` + a registered `redirect_uri` can mint a token. User auth at
+`/authorize` and RS256+JWKS (replacing the shared HS256 secret) are deferred — see `project-spec.md` →
+Decisions.
+
+Generated IdP endpoints: `/oauth/authorize`, `/oauth/token`, and `/oauth/userinfo` (protected showcase —
+Swagger Authorize → Execute). Register extra clients at `db:init` via env: `SEED_CLIENT_ID`,
+`SEED_CLIENT_REDIRECT_URIS`, `SEED_CLIENT_SECRET`.

@@ -5,6 +5,14 @@ export interface ServerConfig {
   authDisabled: boolean;
   corsOrigin: string;
   blueprintsDir: string;
+  /**
+   * Symmetric HS256 secret used to verify access tokens issued by the dogfooded
+   * IdP. Must equal the IdP's own `JWT_SECRET` (prototype coupling — the
+   * documented upgrade path is RS256 + JWKS, out of scope for M2).
+   */
+  oauthJwtSecret: string;
+  /** Expected `iss` claim — must equal the IdP's `OAUTH_ISSUER`. */
+  oauthIssuer: string;
 }
 
 /**
@@ -19,6 +27,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     authDisabled: (env.AUTH_DISABLED ?? 'true').toLowerCase() !== 'false',
     corsOrigin: env.PORTAL_ORIGIN ?? 'http://localhost:5173',
     blueprintsDir: env.FOUNDRY_BLUEPRINTS_DIR ?? defaultBlueprintsDir(),
+    // Match the IdP's defaults (blueprint config.ts.hbs) so the local dogfood
+    // loop verifies out of the box with no extra env.
+    oauthJwtSecret: env.OAUTH_JWT_SECRET ?? 'dev-secret-change-me',
+    oauthIssuer: env.OAUTH_ISSUER ?? 'https://auth.example.com',
   };
 }
 

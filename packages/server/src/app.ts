@@ -14,6 +14,10 @@ export interface AppDeps {
   generator: Generator;
   authDisabled: boolean;
   corsOrigin: string;
+  /** HS256 secret shared with the IdP, used to verify bearer access tokens. */
+  oauthJwtSecret: string;
+  /** Expected token `iss` claim. */
+  oauthIssuer: string;
 }
 
 /**
@@ -28,8 +32,14 @@ export function createApp(deps: AppDeps): Express {
   app.use(express.json({ limit: '1mb' }));
 
   const api = express.Router();
-  // Auth shim guards the whole API surface (open when AUTH_DISABLED).
-  api.use(authMiddleware(deps.authDisabled));
+  // Auth guards the whole API surface (open when AUTH_DISABLED; verifies a real
+  // IdP-issued bearer token otherwise).
+  api.use(
+    authMiddleware(deps.authDisabled, {
+      jwtSecret: deps.oauthJwtSecret,
+      issuer: deps.oauthIssuer,
+    }),
+  );
 
   api.get('/health', (_req, res) => {
     res.json({ ok: true });

@@ -15,11 +15,13 @@
     "@foundry/generator": "*",
     "@foundry/shared": "*",
     "cors": "^2.8.5",
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0"
   }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BlueprintList } from './components/BlueprintList';
 import { ConfigForm } from './components/ConfigForm';
+import { TokenStatus } from './components/TokenStatus';
 import { generate, getManifest, listBlueprints, ValidationFailure } from './api';
 import type { BlueprintManifest, BlueprintSummary, ValidationError } from './types';
 
@@ -82,6 +83,7 @@ export function App() {
           <span className="brand__name">Foundry</span>
         </div>
         <span className="topbar__tag">Service Portal</span>
+        <TokenStatus />
       </header>
 
       <main className="layout">

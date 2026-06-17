@@ -30,7 +30,8 @@ npm run typecheck
 | GET | `/health` | Liveness probe. |
 | GET | `/oauth/authorize` | Issues an authorization code (`?client_id=&scope=`{{#ifEquals pkce true}}`&code_challenge=`{{/ifEquals}}). |
 | POST | `/oauth/token` | Exchanges an authorization code or refresh token for tokens. |
-{{#ifEquals apiDocs true}}| GET | `/docs` | Interactive Swagger UI for the OAuth endpoints. |
+{{#ifEquals tokenStrategy "local-jwt"}}| GET | `/oauth/userinfo` | Protected — returns the authenticated principal (`sub`/`client_id`/`scope`) for a valid access token. |
+{{/ifEquals}}{{#ifEquals apiDocs true}}| GET | `/docs` | Interactive Swagger UI for the OAuth endpoints. |
 {{/ifEquals}}
 
 {{#ifEquals apiDocs true}}
@@ -46,6 +47,14 @@ authorization-code-with-PKCE exchange against `/oauth/authorize` → `/oauth/tok
 The Authorization Code flow is wired into the **Authorize** button so you can run a real
 `/oauth/authorize` → `/oauth/token` exchange from the browser.
 {{/ifEquals}}
+{{#ifEquals tokenStrategy "local-jwt"}}
+**Two-click token demo:** click **Authorize** (runs the full {{#ifEquals pkce true}}PKCE {{/ifEquals}}flow and holds
+an access token), then expand **GET `/oauth/userinfo`** and click **Execute**. Swagger attaches the
+bearer token automatically and the endpoint returns the authenticated principal — exercising the whole
+token flow in two clicks. The raw **POST `/oauth/token`** form is intentionally omitted from the docs:
+its one-time authorization code is consumed by the Authorize button, so a manual "Try it out" never has
+a fresh code.
+{{/ifEquals}}
 {{/ifEquals}}
 
 {{#ifEquals tokenStrategy "local-jwt"}}
@@ -53,6 +62,24 @@ Tokens are minted locally as JWTs signed with `JWT_SECRET`.
 {{else}}
 Tokens are obtained from the external IdP at `IDP_ISSUER`. Wire the exchange in `src/auth/tokens.ts`.
 {{/ifEquals}}
+
+## Registering additional clients
+
+`schema.sql` seeds one default client. To register **another** client (e.g. a front-end app or
+another service) without editing SQL, set these before `npm run db:init` — the migration registers
+it idempotently on top of the default:
+
+| Env var | Description |
+|---------|-------------|
+| `SEED_CLIENT_ID` | Client identifier. When unset, no extra client is registered (default behavior). |
+| `SEED_CLIENT_REDIRECT_URIS` | Comma-separated list of allowed redirect URIs. |
+| `SEED_CLIENT_SECRET` | Optional. Leave unset for a public client (PKCE). |
+
+```bash
+SEED_CLIENT_ID=foundry-portal \
+SEED_CLIENT_REDIRECT_URIS=http://localhost:5173/callback \
+  npm run db:init
+```
 
 ## Integrations
 

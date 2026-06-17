@@ -14,6 +14,8 @@ const app = createApp({
   generator,
   authDisabled: config.authDisabled,
   corsOrigin: config.corsOrigin,
+  oauthJwtSecret: config.oauthJwtSecret,
+  oauthIssuer: config.oauthIssuer,
 });
 
 app.listen(config.port, () => {

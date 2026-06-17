@@ -10,7 +10,7 @@ npm run dev -w @foundry/portal-web
 ```
 
 The dev server runs on **http://localhost:5173** and proxies `/api` to the Foundry
-server (Beta's default port **4000**). Point the proxy at a non-default origin with:
+server (default port **4000**). Point the proxy at a non-default origin with:
 
 ```bash
 VITE_SERVER_ORIGIN=http://localhost:4000 npm run dev -w @foundry/portal-web
