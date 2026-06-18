@@ -17,6 +17,8 @@ Foundry generates production-ready Node/Express services from **blueprints** (pi
 - `packages/server/src/deploy/` — deploy executor + in-memory job store + `/api/deployments` router (host-side terraform/docker pipeline).
 - `apps/portal-web` — Vite + React SPA; renders the config form dynamically from a blueprint's `InputSchema`.
 - `blueprints/<id>/` — payload: `blueprint.json` manifest + `template/` files.
+- `scripts/` — dev-loop harness (`gen-and-run.ts`, the `gen:oauth` runner). Dev-only, not shipped.
+- `docs/` — `PROGRESS.md` (spec/milestone tracking) + `DEMOS.md` (demo guide + runtime topology).
 
 ## Invariants (don't break these)
 1. **The generator talks only to `BlueprintResolver`** — never to the filesystem/storage layout. New storage backends (git-ref, package) are new resolver impls; the generator stays untouched. This ports-and-adapters boundary is the core design.

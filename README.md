@@ -2,17 +2,7 @@
 
 Web portal for bootstrapping production-ready Node/Express services from **blueprints**: pick a blueprint, configure it in the UI, generate a working project, download the zip. See [`project-spec.md`](./project-spec.md).
 
-This repo is an npm-workspaces monorepo (TypeScript, strict).
-
-```
-packages/shared      @foundry/shared      contract types (single source of truth)
-packages/generator   @foundry/generator   FolderResolver + Handlebars + validation + zip
-packages/server      @foundry/server      Express HTTP API (the /api contract)
-apps/portal-web      portal-web           Vite + React SPA
-blueprints/          template payload — NOT part of Foundry's build
-```
-
-> **Boundary:** `blueprints/**` is template payload (it contains `{{handlebars}}` and intentionally-partial source). It is excluded from workspaces, tsconfig, ESLint, Prettier, and Vitest — Foundry's own tooling never compiles it. The generator reads it at runtime via `FolderResolver`.
+This repo is an npm-workspaces monorepo (TypeScript, strict). Repo layout and the invariants that govern it — notably that `blueprints/**` is template payload, never part of Foundry's own build — are documented in [`CLAUDE.md`](./CLAUDE.md) (the `## Layout` and `## Invariants` sections).
 
 ## Status
 
