@@ -39,7 +39,8 @@ async function seedExtraClient(): Promise<void> {
   await pool.query(
     `INSERT INTO oauth_clients (client_id, client_secret, redirect_uris)
      VALUES ($1, $2, $3)
-     ON CONFLICT (client_id) DO NOTHING`,
+     ON CONFLICT (client_id) DO UPDATE
+       SET redirect_uris = ARRAY(SELECT DISTINCT unnest(oauth_clients.redirect_uris || EXCLUDED.redirect_uris))`,
     [clientId, clientSecret, redirectUris],
   );
   // eslint-disable-next-line no-console

@@ -465,3 +465,132 @@ body {
 .modal__actions {
   margin-top: 18px;
 }
+
+/* Form actions row (Generate + Deploy) */
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+.deploy-action {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.deploy-action__region {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.deploy-action__region-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.deploy-action__region .field__input {
+  width: 120px;
+}
+.btn--accent {
+  background: var(--accent);
+  color: white;
+}
+.btn--accent:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+.btn--danger {
+  background: var(--error);
+  color: white;
+}
+.btn--danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn--ghost {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn--sm {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+/* Deploy panel */
+.deploy-panel {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.deploy-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.deploy-panel__title {
+  margin: 0;
+  font-size: 15px;
+}
+.deploy-panel__region {
+  color: var(--muted);
+  font-size: 13px;
+}
+.deploy-panel__head .btn--ghost {
+  margin-left: auto;
+}
+.deploy-panel__url {
+  margin: 0;
+  font-size: 14px;
+}
+.deploy-panel__url a {
+  color: var(--accent);
+}
+.deploy-phase {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.deploy-phase--succeeded {
+  color: var(--success);
+  border-color: var(--success);
+}
+.deploy-phase--failed {
+  color: var(--error);
+  border-color: var(--error);
+}
+.deploy-phase--destroyed {
+  color: var(--muted);
+}
+.deploy-phase--pending,
+.deploy-phase--generating,
+.deploy-phase--tf-init,
+.deploy-phase--provisioning,
+.deploy-phase--building,
+.deploy-phase--pushing,
+.deploy-phase--deploying,
+.deploy-phase--destroying {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.deploy-log {
+  margin: 0;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}

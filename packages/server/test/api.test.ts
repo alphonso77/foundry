@@ -1,16 +1,23 @@
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { FolderResolver, Generator } from '@foundry/generator';
 import { createApp } from '../src/app.js';
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures', 'blueprints');
 const JWT_SECRET = 'test-secret';
 const ISSUER = 'https://auth.test';
+const WORKDIR_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-deploy-test-'));
 
-function app(overrides: { authDisabled?: boolean } = {}) {
+afterAll(() => {
+  fs.rmSync(WORKDIR_ROOT, { recursive: true, force: true });
+});
+
+function app(overrides: { authDisabled?: boolean; deployDryRun?: boolean } = {}) {
   const resolver = new FolderResolver(FIXTURES);
   return createApp({
     resolver,
@@ -19,6 +26,8 @@ function app(overrides: { authDisabled?: boolean } = {}) {
     corsOrigin: 'http://localhost:5173',
     oauthJwtSecret: JWT_SECRET,
     oauthIssuer: ISSUER,
+    deployDryRun: overrides.deployDryRun ?? true,
+    deployWorkdirRoot: WORKDIR_ROOT,
   });
 }
 
@@ -169,5 +178,105 @@ describe('auth (real bearer verification when enabled)', () => {
   it('opens all routes when auth is disabled (dev default)', async () => {
     const res = await request(app({ authDisabled: true })).get('/api/blueprints');
     expect(res.status).toBe(200);
+  });
+});
+
+describe('deployments (DEPLOY_DRY_RUN)', () => {
+  /** Poll GET /api/deployments/:id until it reaches one of `phases` (or times out). */
+  async function pollUntil(server: ReturnType<typeof app>, id: string, phases: string[]) {
+    for (let i = 0; i < 60; i++) {
+      const res = await request(server).get(`/api/deployments/${id}`);
+      if (phases.includes(res.body.phase)) {
+        return res.body;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error(`deployment ${id} never reached ${phases.join('/')}`);
+  }
+
+  it('walks a valid deploy from pending to succeeded with a url', async () => {
+    const server = app();
+    const create = await request(server)
+      .post('/api/deployments')
+      .send({ blueprintId: 'demo', config: { serviceName: 'my-svc' } });
+    expect(create.status).toBe(202);
+    expect(create.body.id).toBeTruthy();
+
+    const done = await pollUntil(server, create.body.id, ['succeeded', 'failed']);
+    expect(done.phase).toBe('succeeded');
+    expect(done.url).toBe('http://dry-run.local');
+    expect(done.region).toBe('us-east-1');
+  });
+
+  it('streams logs by cursor', async () => {
+    const server = app();
+    const create = await request(server)
+      .post('/api/deployments')
+      .send({ blueprintId: 'demo', config: { serviceName: 'my-svc' } });
+    await pollUntil(server, create.body.id, ['succeeded', 'failed']);
+
+    const first = await request(server).get(`/api/deployments/${create.body.id}/logs?cursor=0`);
+    expect(first.status).toBe(200);
+    expect(first.body.lines.length).toBeGreaterThan(0);
+    expect(first.body.done).toBe(true);
+
+    // Reading from nextCursor yields no already-seen lines.
+    const next = await request(server).get(
+      `/api/deployments/${create.body.id}/logs?cursor=${first.body.nextCursor}`,
+    );
+    expect(next.body.lines).toEqual([]);
+    expect(next.body.nextCursor).toBe(first.body.nextCursor);
+  });
+
+  it('400s with field errors for invalid config (mirrors /api/generate)', async () => {
+    const res = await request(app())
+      .post('/api/deployments')
+      .send({ blueprintId: 'demo', config: { serviceName: 'Bad Name!' } });
+    expect(res.status).toBe(400);
+    expect(res.body.errors[0].field).toBe('serviceName');
+  });
+
+  it('404s for an unknown blueprint', async () => {
+    const res = await request(app())
+      .post('/api/deployments')
+      .send({ blueprintId: 'nope', config: {} });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBeTruthy();
+  });
+
+  it('404s when fetching an unknown deployment', async () => {
+    const res = await request(app()).get('/api/deployments/does-not-exist');
+    expect(res.status).toBe(404);
+  });
+
+  it('tears down a deployment to destroyed', async () => {
+    const server = app();
+    const create = await request(server)
+      .post('/api/deployments')
+      .send({ blueprintId: 'demo', config: { serviceName: 'my-svc' } });
+    await pollUntil(server, create.body.id, ['succeeded', 'failed']);
+
+    const del = await request(server).delete(`/api/deployments/${create.body.id}`);
+    expect(del.status).toBe(202);
+
+    const done = await pollUntil(server, create.body.id, ['destroyed', 'failed']);
+    expect(done.phase).toBe('destroyed');
+  });
+
+  it('lists deployments', async () => {
+    const server = app();
+    await request(server)
+      .post('/api/deployments')
+      .send({ blueprintId: 'demo', config: { serviceName: 'my-svc' } });
+    const res = await request(server).get('/api/deployments');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+  });
+
+  it('401s on deploy routes when auth is armed and no token is sent', async () => {
+    const res = await request(app({ authDisabled: false }))
+      .post('/api/deployments')
+      .send({ blueprintId: 'demo', config: { serviceName: 'my-svc' } });
+    expect(res.status).toBe(401);
   });
 });

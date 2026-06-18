@@ -9,4 +9,8 @@ export type {
   SelectOption,
   GenerateRequest,
   ValidationError,
+  DeployRequest,
+  DeploymentPhase,
+  DeploymentStatus,
+  DeploymentLogs,
 } from '@foundry/shared';

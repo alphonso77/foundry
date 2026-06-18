@@ -8,6 +8,9 @@ import {
   kebabCase,
 } from '@foundry/generator';
 import { authMiddleware } from './auth.js';
+import { DeployExecutor } from './deploy/executor.js';
+import { createDeployRouter } from './deploy/router.js';
+import { DeploymentStore } from './deploy/store.js';
 
 export interface AppDeps {
   resolver: BlueprintResolver;
@@ -18,6 +21,10 @@ export interface AppDeps {
   oauthJwtSecret: string;
   /** Expected token `iss` claim. */
   oauthIssuer: string;
+  /** When true, the deploy executor simulates phases without invoking terraform/docker/AWS. */
+  deployDryRun: boolean;
+  /** Base dir under which per-deployment workdirs are created. */
+  deployWorkdirRoot: string;
 }
 
 /**
@@ -111,6 +118,17 @@ export function createApp(deps: AppDeps): Express {
       }
     }),
   );
+
+  // Deploy vertical (M3) — in-memory job store + background executor, behind the
+  // same auth as the rest of /api.
+  const store = new DeploymentStore();
+  const executor = new DeployExecutor({
+    generator: deps.generator,
+    store,
+    workdirRoot: deps.deployWorkdirRoot,
+    dryRun: deps.deployDryRun,
+  });
+  api.use('/deployments', createDeployRouter({ generator: deps.generator, store, executor }));
 
   app.use('/api', api);
 

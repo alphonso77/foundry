@@ -129,3 +129,48 @@ export interface ValidationErrorResponse {
 export interface HealthResponse {
   ok: true;
 }
+
+// ─── Deploy DTOs (M3 — deploy-from-portal to AWS) ─────────────────────────────
+
+/** POST /api/deployments request body. Superset of GenerateRequest. */
+export interface DeployRequest {
+  blueprintId: string;
+  version?: string;
+  /** Keyed by InputField.key — same semantics as GenerateRequest.config. */
+  config: Record<string, unknown>;
+  /** Target AWS region; defaults to 'us-east-1' server-side. */
+  region?: string;
+}
+
+/** Lifecycle of a deployment, advanced in order by the executor. */
+export type DeploymentPhase =
+  | 'pending' // accepted, not started
+  | 'generating' // generate + materialize files to workdir
+  | 'tf-init' // terraform init
+  | 'provisioning' // terraform apply -target=ECR (registry must exist before push)
+  | 'building' // docker build
+  | 'pushing' // ECR login + docker push
+  | 'deploying' // terraform apply (full: service, ALB, etc.)
+  | 'succeeded' // running; url populated
+  | 'failed' // error populated
+  | 'destroying' // terraform destroy in flight
+  | 'destroyed'; // torn down
+
+export interface DeploymentStatus {
+  id: string; // server-generated deployment id
+  blueprintId: string;
+  region: string;
+  phase: DeploymentPhase;
+  url?: string; // http://<alb-dns> once known
+  error?: string; // present iff phase === 'failed'
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+}
+
+/** GET /api/deployments/:id/logs?cursor=N response. */
+export interface DeploymentLogs {
+  id: string;
+  lines: string[]; // log lines from `cursor` onward
+  nextCursor: number; // pass back as ?cursor= to get only new lines
+  done: boolean; // true once phase is terminal (succeeded/failed/destroyed)
+}

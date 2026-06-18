@@ -9,8 +9,12 @@ interface Props {
   manifest: BlueprintManifest;
   serverErrors: ValidationError[];
   submitting: boolean;
+  deploying: boolean;
   onSubmit: (config: Record<string, unknown>) => void;
+  onDeploy: (config: Record<string, unknown>, region: string) => void;
 }
+
+const DEFAULT_REGION = 'us-east-1';
 
 function initialValues(fields: InputField[]): Values {
   const values: Values = {};
@@ -130,10 +134,18 @@ function Control({
   }
 }
 
-export function ConfigForm({ manifest, serverErrors, submitting, onSubmit }: Props) {
+export function ConfigForm({
+  manifest,
+  serverErrors,
+  submitting,
+  deploying,
+  onSubmit,
+  onDeploy,
+}: Props) {
   const fields = manifest.inputs.fields;
   const [values, setValues] = useState<Values>(() => initialValues(fields));
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const [region, setRegion] = useState(DEFAULT_REGION);
 
   const serverErrorMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -147,15 +159,27 @@ export function ConfigForm({ manifest, serverErrors, submitting, onSubmit }: Pro
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  /** Both actions run the same client-side validation before firing. */
+  function validate(): boolean {
     const errors = clientValidate(fields, values);
     setClientErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
-    onSubmit(values as Record<string, unknown>);
+    return Object.keys(errors).length === 0;
   }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (validate()) {
+      onSubmit(values as Record<string, unknown>);
+    }
+  }
+
+  function handleDeploy() {
+    if (validate()) {
+      onDeploy(values as Record<string, unknown>, region.trim() || DEFAULT_REGION);
+    }
+  }
+
+  const busy = submitting || deploying;
 
   return (
     <form className="config-form" onSubmit={handleSubmit} noValidate>
@@ -174,9 +198,32 @@ export function ConfigForm({ manifest, serverErrors, submitting, onSubmit }: Pro
           </div>
         );
       })}
-      <button className="btn btn--primary" type="submit" disabled={submitting}>
-        {submitting ? 'Generating…' : 'Generate & download'}
-      </button>
+      <div className="form-actions">
+        <button className="btn btn--primary" type="submit" disabled={busy}>
+          {submitting ? 'Generating…' : 'Generate & download'}
+        </button>
+        <div className="deploy-action">
+          <label className="deploy-action__region">
+            <span className="deploy-action__region-label">Region</span>
+            <input
+              className="field__input"
+              type="text"
+              value={region}
+              aria-label="AWS region"
+              placeholder={DEFAULT_REGION}
+              onChange={(e) => setRegion(e.target.value)}
+            />
+          </label>
+          <button
+            className="btn btn--accent"
+            type="button"
+            onClick={handleDeploy}
+            disabled={busy}
+          >
+            {deploying ? 'Deploying…' : 'Deploy to AWS'}
+          </button>
+        </div>
+      </div>
     </form>
   );
 }

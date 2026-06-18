@@ -89,7 +89,8 @@
     "src/integrations/salesforce.ts.hbs",
     "src/integrations/hubspot.ts.hbs",
     "infra/main.tf.hbs",
-    "infra/variables.tf",
+    "infra/variables.tf.hbs",
+    "infra/outputs.tf",
     ".github/workflows/ci.yml"
   ]
 }

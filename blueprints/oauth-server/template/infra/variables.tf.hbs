@@ -1,0 +1,23 @@
+variable "aws_region" {
+  description = "AWS region to deploy into."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "service_name" {
+  description = "Name used for all infra resources (cluster, ECR repo, ALB, task). The deploy executor overrides this with kebabCase(serviceName)."
+  type        = string
+  default     = "{{kebabCase serviceName}}"
+}
+
+variable "image_tag" {
+  description = "Tag of the app image in ECR to run. The deploy executor sets this to the deployment id; standalone runs default to latest."
+  type        = string
+  default     = "latest"
+}
+
+variable "desired_count" {
+  description = "Number of ECS task replicas."
+  type        = number
+  default     = 1
+}

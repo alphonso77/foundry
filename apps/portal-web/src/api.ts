@@ -1,6 +1,9 @@
 import type {
   BlueprintManifest,
   BlueprintSummary,
+  DeploymentLogs,
+  DeploymentStatus,
+  DeployRequest,
   GenerateRequest,
   ValidationError,
 } from './types';
@@ -75,4 +78,58 @@ export async function generate(req: GenerateRequest): Promise<Blob> {
     throw new Error(body.error ?? `Generation failed (HTTP ${res.status})`);
   }
   return res.blob();
+}
+
+// ─── Deploy (M3) ──────────────────────────────────────────────────────────────
+
+/** POST /api/deployments. Resolves to the new deployment id (202, async). */
+export async function startDeploy(req: DeployRequest): Promise<string> {
+  const res = await authFetch(`${API_BASE}/deployments`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+
+  if (res.status === 400) {
+    const body = (await res.json().catch(() => ({ errors: [] }))) as {
+      errors?: ValidationError[];
+    };
+    throw new ValidationFailure(body.errors ?? []);
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `Deploy failed (HTTP ${res.status})`);
+  }
+  const body = (await res.json()) as { id: string };
+  return body.id;
+}
+
+/** GET /api/deployments/:id. */
+export async function getDeployment(id: string): Promise<DeploymentStatus> {
+  const res = await authFetch(`${API_BASE}/deployments/${encodeURIComponent(id)}`);
+  if (!res.ok) {
+    throw new Error(`Failed to load deployment (HTTP ${res.status})`);
+  }
+  return (await res.json()) as DeploymentStatus;
+}
+
+/** GET /api/deployments/:id/logs?cursor=N. */
+export async function getDeploymentLogs(id: string, cursor: number): Promise<DeploymentLogs> {
+  const res = await authFetch(
+    `${API_BASE}/deployments/${encodeURIComponent(id)}/logs?cursor=${cursor}`,
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to load logs (HTTP ${res.status})`);
+  }
+  return (await res.json()) as DeploymentLogs;
+}
+
+/** DELETE /api/deployments/:id — begins teardown (202, async). */
+export async function teardownDeployment(id: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/deployments/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    throw new Error(`Teardown failed (HTTP ${res.status})`);
+  }
 }

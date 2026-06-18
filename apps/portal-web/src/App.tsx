@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { BlueprintList } from './components/BlueprintList';
 import { ConfigForm } from './components/ConfigForm';
+import { DeployPanel } from './components/DeployPanel';
 import { TokenStatus } from './components/TokenStatus';
-import { generate, getManifest, listBlueprints, ValidationFailure } from './api';
+import { generate, getManifest, listBlueprints, startDeploy, ValidationFailure } from './api';
 import type { BlueprintManifest, BlueprintSummary, ValidationError } from './types';
 
 function errMsg(e: unknown): string {
@@ -28,6 +29,8 @@ export function App() {
   const [manifest, setManifest] = useState<BlueprintManifest | null>(null);
   const [serverErrors, setServerErrors] = useState<ValidationError[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [deploying, setDeploying] = useState(false);
+  const [deploymentId, setDeploymentId] = useState<string | null>(null);
   const [banner, setBanner] = useState<Banner | null>(null);
 
   useEffect(() => {
@@ -41,6 +44,7 @@ export function App() {
     setManifest(null);
     setServerErrors([]);
     setBanner(null);
+    setDeploymentId(null);
     try {
       setManifest(await getManifest(id));
     } catch (e) {
@@ -72,6 +76,29 @@ export function App() {
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDeploy(config: Record<string, unknown>, region: string): Promise<void> {
+    if (!manifest) {
+      return;
+    }
+    setDeploying(true);
+    setServerErrors([]);
+    setBanner(null);
+    try {
+      const id = await startDeploy({ blueprintId: manifest.id, config, region });
+      setDeploymentId(id);
+      setBanner({ kind: 'success', text: `Deploy started in ${region}.` });
+    } catch (e) {
+      if (e instanceof ValidationFailure) {
+        setServerErrors(e.errors);
+        setBanner({ kind: 'error', text: 'Please fix the highlighted fields.' });
+      } else {
+        setBanner({ kind: 'error', text: errMsg(e) });
+      }
+    } finally {
+      setDeploying(false);
     }
   }
 
@@ -115,8 +142,17 @@ export function App() {
                 manifest={manifest}
                 serverErrors={serverErrors}
                 submitting={submitting}
+                deploying={deploying}
                 onSubmit={handleGenerate}
+                onDeploy={handleDeploy}
               />
+              {deploymentId ? (
+                <DeployPanel
+                  key={deploymentId}
+                  deploymentId={deploymentId}
+                  onClear={() => setDeploymentId(null)}
+                />
+              ) : null}
             </>
           )}
         </section>

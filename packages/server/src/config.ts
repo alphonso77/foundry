@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 
 export interface ServerConfig {
@@ -13,6 +14,13 @@ export interface ServerConfig {
   oauthJwtSecret: string;
   /** Expected `iss` claim — must equal the IdP's `OAUTH_ISSUER`. */
   oauthIssuer: string;
+  /**
+   * When true, deploys simulate every phase (no terraform/docker/AWS calls) so
+   * the UI and verification can run the full loop without AWS spend.
+   */
+  deployDryRun: boolean;
+  /** Base dir for per-deployment workdirs (each is `<root>/<id>`). */
+  deployWorkdirRoot: string;
 }
 
 /**
@@ -31,6 +39,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     // loop verifies out of the box with no extra env.
     oauthJwtSecret: env.OAUTH_JWT_SECRET ?? 'dev-secret-change-me',
     oauthIssuer: env.OAUTH_ISSUER ?? 'https://auth.example.com',
+    // Off by default — a deploy hits real AWS unless explicitly set to "true".
+    deployDryRun: (env.DEPLOY_DRY_RUN ?? 'false').toLowerCase() === 'true',
+    deployWorkdirRoot: env.DEPLOY_WORKDIR_ROOT ?? path.join(os.tmpdir(), 'foundry-deploys'),
   };
 }
 

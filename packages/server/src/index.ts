@@ -16,12 +16,15 @@ const app = createApp({
   corsOrigin: config.corsOrigin,
   oauthJwtSecret: config.oauthJwtSecret,
   oauthIssuer: config.oauthIssuer,
+  deployDryRun: config.deployDryRun,
+  deployWorkdirRoot: config.deployWorkdirRoot,
 });
 
 app.listen(config.port, () => {
   console.log(
     `[foundry] API listening on http://localhost:${config.port}  ` +
       `(auth ${config.authDisabled ? 'DISABLED' : 'enabled'}, ` +
-      `blueprints: ${config.blueprintsDir}, cors: ${config.corsOrigin})`,
+      `blueprints: ${config.blueprintsDir}, cors: ${config.corsOrigin}, ` +
+      `deploy ${config.deployDryRun ? 'DRY-RUN' : 'live'})`,
   );
 });
