@@ -56,7 +56,7 @@ There are two *other* ways to run things, both still supported:
 
 | # | Demo | What it shows | Status |
 |---|------|---------------|--------|
-| **A** | **Deploy to AWS** | Portal **Deploy** button → real ECS/Fargate + ALB + Postgres sidecar; live `/docs` at an AWS URL; **Teardown** | **Built + dry-run-verified; arm64→ARM Fargate fix queued (Gamma `/polish`), then ready for first live apply** |
+| **A** | **Deploy to AWS** | Portal **Deploy** button → real ECS/Fargate + ALB + Postgres sidecar; live `/docs` at an AWS URL; **Teardown** | **Built + dry-run-verified; ready for first live apply** |
 | B | Generate + download | Pick blueprint → config form → **Generate & download** a buildable project zip | Proven |
 | C | Dev-loop harness | `npm run gen:oauth` → generate→install→db:init→run in one command (`.scratch/`) | Proven |
 | D | Secured portal loop (M2) | Portal + API secured by the generated IdP (auth-code + PKCE, client-level identity) | Proven |
@@ -107,11 +107,11 @@ runs on **ARM64** — a `runtime_platform { operating_system_family = "LINUX", c
 fast and the task starts cleanly. (`node:20-alpine` and `postgres:16-alpine` are both multi-arch;
 ARM Fargate is supported in us-east-1.)
 
-> **Prerequisite — apply the arm64 fix first.** That `runtime_platform` block is a queued Gamma
-> polish item, not yet merged. Before your first live apply: run `/polish` in a Gamma terminal, then
-> `/delta` to re-verify (regenerate → `terraform validate` / `fmt` clean). **Without it**, the task
-> def defaults to **linux/x86_64**, the arm64 image won't run (`exec format error` in CloudWatch, ALB
-> targets never become healthy), and the deploy reaches `succeeded` but the URL never serves.
+> **Note — the arm64 fix is included by default.** The `runtime_platform` block ships in the
+> generated task definition (`blueprints/oauth-server/template/infra/main.tf.hbs`), so no extra step
+> is needed. **Without it**, the task def would default to **linux/x86_64**, the arm64 image wouldn't
+> run (`exec format error` in CloudWatch, ALB targets never become healthy), and the deploy would
+> reach `succeeded` but the URL would never serve.
 
 **Where Terraform state lives:** each deploy writes to `<tmpdir>/foundry-deploys/<id>/infra`
 (override with `DEPLOY_WORKDIR_ROOT`). Teardown reads that workdir's `meta.json`, so don't clear

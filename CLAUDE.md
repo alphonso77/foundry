@@ -1,6 +1,6 @@
 # Foundry — Agent Guide
 
-Foundry generates production-ready Node/Express services from **blueprints** (pick → configure → generate → download zip). Product intent: `project-spec.md`. Dev/run/API reference: `README.md`. This file is orientation + the invariants that are easy to break.
+Foundry generates production-ready Node/Express services from **blueprints** (pick → configure → generate → download a zip or deploy live to AWS). Product intent: `project-spec.md`. Dev/run/API reference: `README.md`. This file is orientation + the invariants that are easy to break.
 
 ## Commands
 - `npm install` — resolve workspaces
@@ -8,11 +8,13 @@ Foundry generates production-ready Node/Express services from **blueprints** (pi
 - `npm test` — Vitest (generator + server) · `npm run typecheck` · `npm run lint`
 - `docker compose up` — full topology (portal :5173 + API :4000 + Postgres), auth bypassed
 - `npm run gen:oauth` — dev-loop harness: generate the OAuth blueprint into `.scratch/` → install → `db:init` → run (against the compose Postgres). `-- --help` for flags. Dev-only; drives the generator programmatically.
+- Deploy/Teardown to AWS is **host-side** (portal Deploy button → `/api/deployments`); needs `terraform` + `docker` (daemon up) + `aws` CLI on PATH and AWS creds. `DEPLOY_DRY_RUN=true` simulates without touching AWS. See `docs/DEMOS.md`.
 
 ## Layout
 - `packages/shared` (`@foundry/shared`) — contract types: the single source of truth (interfaces + HTTP DTOs).
 - `packages/generator` — `FolderResolver` + `Generator` (Handlebars + validation + jszip).
 - `packages/server` — Express API implementing `/api`.
+- `packages/server/src/deploy/` — deploy executor + in-memory job store + `/api/deployments` router (host-side terraform/docker pipeline).
 - `apps/portal-web` — Vite + React SPA; renders the config form dynamically from a blueprint's `InputSchema`.
 - `blueprints/<id>/` — payload: `blueprint.json` manifest + `template/` files.
 
@@ -50,3 +52,26 @@ Decisions.
 Generated IdP endpoints: `/oauth/authorize`, `/oauth/token`, and `/oauth/userinfo` (protected showcase —
 Swagger Authorize → Execute). Register extra clients at `db:init` via env: `SEED_CLIENT_ID`,
 `SEED_CLIENT_REDIRECT_URIS`, `SEED_CLIENT_SECRET`.
+
+## Deploy to AWS (M3)
+The portal can **deploy** a generated service live to AWS (Deploy + Teardown buttons), not just
+download a zip. Endpoints: `POST /api/deployments` (202 + id, async) · `GET /api/deployments[/:id]` ·
+`GET /api/deployments/:id/logs?cursor=N` · `DELETE /api/deployments/:id`. Implementation:
+`packages/server/src/deploy/`.
+
+**Deploy runs host-side, not compose** (like the secured loop): the executor materializes the
+generated project to a workdir, then shells `terraform` + `docker` + `aws` — targeted ECR apply →
+`docker build`/`push` → full `terraform apply` → read ALB DNS; teardown is `terraform destroy`.
+`DEPLOY_DRY_RUN=true` simulates every phase (tests + UI); `DEPLOY_WORKDIR_ROOT` sets the workdir
+base. Startup banner shows `deploy live` vs `DRY-RUN`.
+
+**Generated AWS IaC** (`blueprints/oauth-server/template/infra/`): ECS **Fargate (ARM64)** +
+HTTP-only ALB + Postgres sidecar (ephemeral), default VPC, local Terraform state — PoC-grade (no
+TLS/RDS/Secrets Manager). All resources are named from `kebabCase(serviceName)`, so there's **one
+live stack per service name** — teardown before redeploying the same name (fresh local state
+collides on existing names). The image builds locally as arm64, so the task def pins **ARM64**
+Fargate to match; the task def also seeds the dev client's deployed Swagger redirect
+(`http://<alb-dns>/docs/oauth2-redirect.html`) via `SEED_CLIENT_*` so Authorize works on the
+deployed `/docs`.
+
+Demo walkthroughs (deploy, generate, dev-loop, secured loop): `docs/DEMOS.md`.

@@ -8,8 +8,8 @@ This repo is an npm-workspaces monorepo (TypeScript, strict).
 packages/shared      @foundry/shared      contract types (single source of truth)
 packages/generator   @foundry/generator   FolderResolver + Handlebars + validation + zip
 packages/server      @foundry/server      Express HTTP API (the /api contract)
-apps/portal-web      portal-web           Vite + React SPA            (Gamma)
-blueprints/          template payload — NOT part of Foundry's build   (Gamma)
+apps/portal-web      portal-web           Vite + React SPA
+blueprints/          template payload — NOT part of Foundry's build
 ```
 
 > **Boundary:** `blueprints/**` is template payload (it contains `{{handlebars}}` and intentionally-partial source). It is excluded from workspaces, tsconfig, ESLint, Prettier, and Vitest — Foundry's own tooling never compiles it. The generator reads it at runtime via `FolderResolver`.

@@ -7,7 +7,7 @@
 # Or run without Docker (faster iteration):
 #     npm install
 #     npm run dev          # API server only (packages/server, tsx watch)
-#     npm run dev -w portal-web   # Gamma's Vite dev server (once it exists)
+#     npm run dev -w portal-web   # the portal's Vite dev server
 #
 # Each service runs `npm install` on start and mounts the repo, so source edits
 # hot-reload. node_modules is an anonymous volume per service so the host's
@@ -48,9 +48,8 @@ services:
     depends_on:
       - postgres
 
-  # Gamma owns the app under apps/portal-web; this service definition (port,
-  # env, command) is ready for it. Until that workspace exists the container
-  # will exit — that's expected and does not affect `server`.
+  # The portal app lives under apps/portal-web; this service definition (port,
+  # env, command) runs its Vite dev server.
   portal-web:
     image: node:24-alpine
     working_dir: /app

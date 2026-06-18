@@ -14,7 +14,7 @@ they live in the code and go stale when mirrored.
 - ✅ **M1** — Portal UI: list → configure → generate → download; dockerized local dev (auth bypassed). Generated project ships an interactive Swagger UI (`/docs`) with PKCE pre-wired.
 - ✅ **M1.5 — M2 enablement** — the generated OAuth server is a functionally-complete, Postgres-persisted authorization-code + PKCE IdP; a one-command dev-loop harness (`npm run gen:oauth`) collapses generate → install → `db:init` → run.
 - ✅ **M2** — Dogfood OAuth: the generated IdP secures the Foundry portal (client-level identity; `AUTH_DISABLED` bypass remains for local/dev).
-- ⬜ **M3** — Deploy-from-portal to AWS.
+- ✅ **M3** — Deploy-from-portal to AWS: a Deploy/Teardown button stands up the generated service live on ECS/Fargate (host-side terraform/docker pipeline). PoC-grade.
 - ⬜ **M4** — New repo per generation; second real blueprint; self-host capstone.
 
 ---
@@ -40,6 +40,30 @@ Identity is client-level (`subject = client_id`) — see **M2 security posture**
 limitation. Carried-forward M1.5 constraints still hold: refresh tokens are stateless JWT (no server-side
 revocation); `redirect_uri` binding is RFC-precise (§4.1.3, required at `/token` only if sent at
 `/authorize`); the seeded flow assumes `PORT=3000`.
+
+---
+
+## M3 — deploy-from-portal (complete)
+
+The portal can deploy a generated service live to AWS and tear it down, from **Deploy** / **Teardown**
+buttons:
+- **Portal/API** (`packages/server`) exposes `/api/deployments` (async: `POST`→202+id, status +
+  cursor-based log polling, `DELETE`=teardown). The deploy **executor runs host-side** — it
+  materializes the generated project to a workdir and shells `terraform` + `docker` + `aws` (targeted
+  ECR apply → `docker build`/`push` → full apply → read ALB DNS); teardown is `terraform destroy`.
+  `DEPLOY_DRY_RUN=true` simulates the whole pipeline without AWS (used by tests + UI).
+- **Generated IaC** (`blueprints/oauth-server/template/infra/`): an apply-ready ECS **Fargate (ARM64)**
+  service + HTTP-only ALB + ephemeral Postgres sidecar in the default VPC, local Terraform state. The
+  deployed dev client self-registers its Swagger redirect (the ALB URL) via `SEED_CLIENT_*`, so
+  Authorize works on the deployed `/docs`.
+- **Verified end-to-end against live AWS** (deploy → `/docs` Authorize + PKCE → teardown clean). Demo
+  walkthroughs: [`DEMOS.md`](DEMOS.md).
+
+**PoC-grade by design** (deferred): HTTP-only (no TLS/domain), containerized Postgres (no RDS;
+ephemeral data), plain-env secrets (no Secrets Manager), local Terraform state, deploy is **host-side,
+not compose**. Resources are named from `kebabCase(serviceName)` → **one live stack per service name**
+(teardown before redeploying the same name; fresh local state would otherwise collide on existing
+names).
 
 ---
 
@@ -154,13 +178,27 @@ browser, `sessionStorage.clear()` then reload with the Network tab open — a re
 
 ## Deferred / not yet started
 
-- **Portal automated tests** — none yet.
+- **Portal automated tests** — none yet (M3 added server-side deploy tests; the SPA is still untested).
 - **`GitRefResolver` / `PackageResolver`** — deferred per spec decision (blueprints stay in-repo until a real need).
 - **Bare Express API blueprint** (optional generator smoke-test) — not started.
 - **Second real blueprint** (proves the abstraction generalizes) — M4.
 - **Foundry self-host blueprint** (capstone) — M4.
-- **Deploy-from-portal** — M3.
 - **New-repo-per-generation** — M4.
+- **Compose nested-`node_modules` isolation** (small) — full-stack `docker compose up` still leaks `apps/portal-web/node_modules` across host/container; one-line per-workspace anonymous-volume fix pending (doesn't affect the Postgres-only-compose + host-side dev workflow).
+
+### Future discussion items (not decided — open for discussion, not committed work)
+
+- **Single-`docker compose up` workflow** — folding deploy into one compose-up so everything (incl. the
+  Deploy button) starts from a single command. Explored during M3; **not adopted** — it forces the
+  host-vs-container deploy question (a container can't drive `docker build` without mounting the host
+  Docker socket). Revisit only if the multi-process startup becomes a real friction.
+- **Pluggable image-builder (e.g. AWS CodeBuild)** — so deploy needs no local Docker daemon. Most
+  relevant to the **M4 self-host capstone**: a cloud-hosted Foundry can't use a host Docker socket, so
+  the local-`docker build` step doesn't generalize. Worth a design discussion before M4.
+- **Live-apply as part of verification** — three deployed-runtime gaps (Dockerfile migrate-on-boot,
+  arm64 image vs Fargate arch, deployed Swagger redirect URI) were caught only by a real AWS apply,
+  not by dry-run or `terraform validate`. Consider whether the verification story should include a
+  gated live apply.
 
 ---
 
@@ -174,7 +212,7 @@ browser, `sessionStorage.clear()` then reload with the Network tab open — a re
 | Portal auth | `AUTH_DISABLED` bypass for local/dev | ✅ (real OAuth = M2) |
 | Refresh-token strategy | — | ✅ Stateless JWT — no server-side revocation (deliberate prototype choice; revisit when a real principal model lands) |
 | Independent blueprint versioning (git-ref / packages) | Deferred until real need | ⬜ Deferred |
-| Deploy-from-portal | Later phase | ⬜ M3 |
+| Deploy-from-portal | Later phase | ✅ M3 — host-side terraform/docker pipeline, PoC-grade |
 | New-repo-per-generation | Later phase | ⬜ M4 |
 
 ---

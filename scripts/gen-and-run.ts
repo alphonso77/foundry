@@ -48,7 +48,7 @@ const DEFAULT_PORT = 3000; // matches the blueprint's seeded Swagger redirect UR
 const SHARED_JWT_SECRET = 'dev-secret-change-me';
 const SHARED_OAUTH_ISSUER = 'https://auth.example.com';
 // The IdP registers Foundry's portal as an OAuth client via the env-driven seed
-// (SEED_CLIENT_* — Beta's db-init feature). PKCE public client, Vite dev origin.
+// (SEED_CLIENT_* — the server's db-init feature). PKCE public client, Vite dev origin.
 const PORTAL_CLIENT_ID = 'foundry-portal';
 const PORTAL_REDIRECT_URIS = 'http://localhost:5173/callback';
 
